@@ -1,0 +1,49 @@
+# TODO
+
+
+image:
+  repository: api-gateway
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 9090
+
+config:
+  apiPort: "9090"
+
+db:
+  host:               "postgres"
+  port:               "5432"
+  name:               "telemetry"
+  user:               "telemetry"
+  password:           "telemetry"
+  passwordSecretName: ""
+  maxOpenConns:       "10"
+  maxIdleConns:       "5"
+  connMaxLifetime:    "5m"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 9090
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 9090
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3

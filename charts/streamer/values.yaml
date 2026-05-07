@@ -1,0 +1,33 @@
+# TODO
+
+
+image:
+  repository: streamer
+  tag: latest
+  pullPolicy: IfNotPresent
+
+config:
+  queueAddr:          "http://message-queue:8080"
+  csvPath:            "/data/dcgm_metrics_20250718_134233.csv"
+  emitInterval:       "1s"
+  batchSize:          "10"
+  maxRetries:         "5"
+
+# CSV data is mounted from a ConfigMap or PersistentVolume.
+# Set csvConfigMapName to the name of a ConfigMap containing the CSV data.
+csvConfigMapName: "telemetry-csv"
+
+# Horizontal Pod Autoscaler — scales streamer pods 1–10 based on CPU.
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

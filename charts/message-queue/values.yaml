@@ -1,0 +1,50 @@
+# TODO
+
+
+image:
+  repository: message-queue
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+config:
+  queuePort:               "8080"
+  queueCapacity:           "10000"
+  leaseDuration:           "30s"
+  leaseReaperInterval:     "5s"
+  maxDeliveryAttempts:     "3"
+  batchSize:               "10"
+  publishTimeout:          "10s"
+  longPollTimeout:         "30s"
+  shutdownGracePeriod:     "30s"
+  httpReadTimeout:         "15s"
+  httpWriteTimeout:        "40s"
+  httpIdleTimeout:         "60s"
+  maxRequestBodySize:      "65536"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3

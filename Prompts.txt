@@ -1,0 +1,38 @@
+Initial project understanding:
+We will be working on an new Go project. The Project description and requirements document PDF and testing sample data CSV files are attached in the context. Please read them thoroughly and explain the requirements of this project to me.
+
+---
+
+Which component do you think will take the most time and effort to implement, and why?
+
+---
+
+Let's discuss each problem we need to solve in the message queue. Let's take one point at a time, discuss and finalise it, and then move on to the next one.
+
+---
+
+What is a Ring Buffer?
+
+Why would we use a Ring BUffer? What are the advantages and tradeoffs? why not use just a channel, or a normal queue implementation?
+
+What do you mean by dead-letter the message? If we implement a dead letter queue, will it not be complex for this project?
+
+okay let's discuss the Consumer Group coordination
+
+Let's discuss the Backpressure
+
+Let's discuss the Service Discovery
+
+we haven't discussed about the message queuues's communication protocol on both sides
+
+Is there anything else in the Message Queue architecture that we missed and needs discussion
+
+okay now shall we discuss each API endpoint in detail for the message queue as well
+
+for the concurrency part, why net/http and not gin framework?
+
+Now that we have discussed the architecture for Message queue, create a comprehensive and detailed document for the Message Queue service (named message-queue in Kubernetes.). It should contain everything we have discussed regarding the Message Queue service explained in detail, and easy for anyone to understand.
+
+---
+
+Although we haven't yet discussed the other components yet, still you are already aware of the entire project requirements. Give me an appropriate structure for our GPU Telemetry Pipeline project.

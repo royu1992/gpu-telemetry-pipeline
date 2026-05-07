@@ -1,0 +1,40 @@
+# TODO
+
+
+image:
+  repository: collector
+  tag: latest
+  pullPolicy: IfNotPresent
+
+config:
+  queueAddr:      "http://message-queue:8080"
+  batchSize:      "10"
+  maxRetries:     "5"
+
+db:
+  host:               "postgres"
+  port:               "5432"
+  name:               "telemetry"
+  user:               "telemetry"
+  # Password should come from a Kubernetes Secret in production.
+  # Set db.passwordSecretName to reference an existing Secret.
+  password:           "telemetry"
+  passwordSecretName: ""
+  maxOpenConns:       "10"
+  maxIdleConns:       "5"
+  connMaxLifetime:    "5m"
+
+# Horizontal Pod Autoscaler — scales collector pods 1–10 based on CPU.
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 300m
+    memory: 256Mi
