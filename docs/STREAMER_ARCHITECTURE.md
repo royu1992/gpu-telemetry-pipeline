@@ -6,7 +6,7 @@
 2. [Responsibility & Role in the Pipeline](#1-responsibility--role-in-the-pipeline)
 3. [Input Model — CSV File](#2-input-model--csv-file)
 4. [CSV Parsing Strategy](#3-csv-parsing-strategy)
-5. [Hostname Normalization](#4-hostname-normalization)
+5. [Hostname Resolution](#4-hostname-resolution)
 6. [Delivery Model](#5-delivery-model)
 7. [Throughput Control](#6-throughput-control)
 8. [Retry Policy](#7-retry-policy)
@@ -125,9 +125,9 @@ Because the file is streamed one row at a time, the Streamer's memory footprint 
 
 ---
 
-## 4. Hostname Normalization
+## 4. Hostname Resolution
 
-The `Hostname` column in the CSV identifies the physical GPU node that generated the telemetry. However, in practice, this field can be missing, malformed, or inconsistently cased. The Streamer applies a deterministic four-step normalization process before every row is sent.
+The `Hostname` column in the CSV identifies the physical GPU node that generated the telemetry. However, in practice, this field can be missing or malformed. The Streamer applies a deterministic three-step resolution process before every row is sent.
 
 ### Rule 6.1 — Whitespace Trimming
 
@@ -163,18 +163,7 @@ Priority 3: Static string "unknown-host"
 
 In a Kubernetes environment, `os.Hostname()` returns the **pod name**, which is a meaningful and traceable identity for observability purposes. The static fallback `"unknown-host"` ensures that the service never panics or produces a message with a missing host field, while making it obvious in the database that the data has a provenance problem.
 
-### Rule 6.4 — Lowercase Normalization
-
-The final resolved hostname (from any of the three priorities above) is converted to **lowercase**.
-
-```
-"GPU-NODE-01"     →  "gpu-node-01"
-"mtv5-DGX1-031"  →  "mtv5-dgx1-031"
-```
-
-**Rationale:** Hostnames in networking are case-insensitive by convention, but string comparisons in databases and dashboards are case-sensitive. Without normalization, `GPU-NODE-01` and `gpu-node-01` would appear as two separate hosts in every query and graph.
-
-### Complete Normalization Example
+### Complete Resolution Example
 
 ```go
 func resolveHostname(csvHostname string) string {
@@ -190,8 +179,7 @@ func resolveHostname(csvHostname string) string {
         }
     }
 
-    // Rule 6.4: Normalize to lowercase
-    return strings.ToLower(h)
+    return h
 }
 ```
 
@@ -445,7 +433,7 @@ The Streamer exposes four metrics on the `/metrics` endpoint (Prometheus text fo
 | `streamer_last_sent_timestamp_seconds` | Gauge | Unix timestamp of the last successful POST |
 | `streamer_last_row_read_timestamp_seconds` | Gauge | Unix timestamp of the last successful CSV row read |
 
-### How to Use These Metrics for Alerting
+### How to Use These Metrics for Alerting (Optional)
 
 **Is the Streamer alive and sending?**
 ```

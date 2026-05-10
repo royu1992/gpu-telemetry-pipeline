@@ -56,3 +56,5 @@ Think thoroughly, did we miss anything on the Streamer discussion?
 okay lastly, let's revisit every point discussed for Streamer architecture
 
 Now that we have discussed the architecture for Streamer, create a comprehensive and detailed document for the Streamer service (named streamer in Kubernetes.). It should contain everything we have discussed regarding the Streamer service explained in detail, and easy for anyone to understand.
+
+Please write the unit tests for every method/function in every file for streamer service. Use table-driven tests. Ensure there is 100% coverage for every block inside every function/method present in message_service. Add comments for every step in every function too.
