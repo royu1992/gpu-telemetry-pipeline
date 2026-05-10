@@ -197,7 +197,7 @@ Each slot in the ring buffer moves through a defined set of states. Understandin
 | `EMPTY → PENDING` | Streamer publishes a message | Slot holds new message, head advances |
 | `PENDING → IN_FLIGHT` | Collector consumes the slot | `delivery_id` and `lease_expires` stamped, attempt count incremented |
 | `IN_FLIGHT → PENDING` | Lease reaper finds expired lease | `delivery_id` cleared, slot available for redelivery |
-| `IN_FLIGHT → EMPTY` | Collector sends valid ack | Slot cleared, `notFull` signalled, tail advances |
+| `IN_FLIGHT → EMPTY` | Collector sends valid ack | Slot cleared, `canPublish` signalled, tail advances |
 | `IN_FLIGHT → DROPPED` | Delivery attempt count exceeds `MAX_DELIVERY_ATTEMPTS` | Message logged at ERROR, slot freed |
 | `DROPPED → EMPTY` | Immediate after logging | Slot available for new messages |
 
@@ -379,25 +379,25 @@ Collector → GET /consume → 200 {message}   (finally, 3 wasted round trips)
 
 #### Long Polling
 
-With long polling, the server **holds the connection open** until a message arrives or a timeout elapses. The Collector gets messages the instant they become available, with zero wasted requests:
+With long polling, the server **holds the connection open** until a message arrives or the `long_poll_timeout` elapses. The Collector gets messages the instant they become available, with zero wasted requests:
 
 ```
-Collector → GET /messages/consume?timeout=30s
+Collector → GET /messages/consume?long_poll_timeout=30s
 
             [server blocks — queue is empty]
             [message arrives at t=4s]
 
 Collector ← 200 { messages: [...] }   (responded after 4s)
 
-Collector → GET /messages/consume?timeout=30s  (immediately re-requests)
+Collector → GET /messages/consume?long_poll_timeout=30s  (immediately re-requests)
 ```
 
 #### Batching
 
-Instead of one message per request, the server returns up to `max` messages. The Collector processes the batch and sends a single bulk acknowledgment:
+Instead of one message per request, the server returns up to `batch_size` messages. The Collector processes the batch and sends a single bulk acknowledgment:
 
 ```
-GET /messages/consume?max=10&timeout=30s
+GET /messages/consume?batch_size=10&long_poll_timeout=30s
 
 → Returns up to 10 messages in one response
 → Collector processes all 10
@@ -633,17 +633,17 @@ Content-Type: application/json
 
 ### `GET /messages/consume` — Consume a Batch (Long Poll)
 
-Called by Collectors to receive a batch of messages. The server blocks until at least one message is available or the timeout elapses.
+Called by Collectors to receive a batch of messages. The server blocks until at least one message is available or the `long_poll_timeout` elapses.
 
 **Request:**
 ```
-GET /messages/consume?max=10&timeout=30s&consumer_id=collector-pod-abc123
+GET /messages/consume?batch_size=10&long_poll_timeout=30s&consumer_id=collector-pod-abc123
 ```
 
 | Query Param | Default | Description |
 |---|---|---|
-| `max` | `10` | Maximum number of messages to return |
-| `timeout` | `30s` | Maximum wait time if queue is empty |
+| `batch_size` | `10` | Maximum number of messages to return |
+| `long_poll_timeout` | `30s` | Maximum wait time if queue is empty |
 | `consumer_id` | required | Unique identifier for this Collector instance |
 
 **Responses:**
@@ -651,7 +651,7 @@ GET /messages/consume?max=10&timeout=30s&consumer_id=collector-pod-abc123
 | Status | Meaning |
 |---|---|
 | `200 OK` | One or more messages returned |
-| `204 No Content` | Timeout elapsed, queue was empty |
+| `204 No Content` | `long_poll_timeout` elapsed, queue was empty |
 | `503 Service Unavailable` | Queue is shutting down |
 
 ```json
@@ -831,8 +831,8 @@ Gin HTTP Server
 
 - The ring buffer is protected by a **single `sync.Mutex`** — all reads and writes acquire it
 - **`sync.Cond`** is used for efficient blocking:
-  - `notFull` condition — publish goroutines wait here when the buffer is full; signalled when a slot is freed by an ack
-  - `notEmpty` condition — consume goroutines wait here when the buffer is empty; signalled when a new message is published
+  - `canPublish` condition — publish goroutines wait here when the buffer is full; signalled when a slot is freed by an ack
+  - `canConsume` condition — consume goroutines wait here when the buffer is empty; signalled when a new message is published
 - This avoids busy-waiting — goroutines sleep until the condition changes, using zero CPU
 - The lease reaper goroutine acquires the same mutex during its scan — no race conditions
 - **Lease reaper holds the mutex only briefly per slot**, not for the full scan. It locks, inspects and resets one slot, unlocks, then moves to the next. This prevents a full 10,000-slot scan from blocking publish/consume goroutines for a noticeable duration on every reaper tick.

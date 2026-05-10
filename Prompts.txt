@@ -36,3 +36,23 @@ Now that we have discussed the architecture for Message queue, create a comprehe
 ---
 
 Although we haven't yet discussed the other components yet, still you are already aware of the entire project requirements. Give me an appropriate structure for our GPU Telemetry Pipeline project.
+
+---
+
+okay... now that we have the architecture discussed for the Message Queue, please do the initial implementation of the message-queue service; follow idiomaic Go coding standards, don't write unit tests now
+
+For the message-queue service implementation, please add comments for every function/method you have written, and also for each step inside every function/method.
+
+---
+
+Please write the unit tests for every method/function in every file for message-queue service. Use table-driven tests. Ensure there is 100% coverage for every block inside every function/method present in message_service.
+
+---
+
+Okay now Let's discuss each problem we need to solve in the streamer service. Let's take one point at a time, discuss and finalise it, and then move on to the next one.
+
+Think thoroughly, did we miss anything on the Streamer discussion?
+
+okay lastly, let's revisit every point discussed for Streamer architecture
+
+Now that we have discussed the architecture for Streamer, create a comprehensive and detailed document for the Streamer service (named streamer in Kubernetes.). It should contain everything we have discussed regarding the Streamer service explained in detail, and easy for anyone to understand.
