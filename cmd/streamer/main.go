@@ -1,3 +1,9 @@
+// @title           GPU Telemetry Pipeline — Streamer API
+// @version         1.0
+// @description     Internal health and observability API for the Telemetry Streamer service.
+// @host            localhost:8081
+// @BasePath        /
+// @schemes         http
 package main
 
 import (
@@ -34,7 +40,7 @@ func main() {
 		"port", cfg.Port,
 	)
 
-		// Open the CSV file and build the column index. This is the first
+	// Open the CSV file and build the column index. This is the first
 	// operation that touches the file system, so any misconfiguration
 	// (wrong path, missing file, wrong schema) will surface here rather
 	// than silently at runtime.
@@ -51,7 +57,7 @@ func main() {
 	// to these and the Gin server goroutine reads them via atomic operations.
 	m := metrics.New()
 
-		// Construct the HTTP publisher. It holds a shared http.Client whose transport
+	// Construct the HTTP publisher. It holds a shared http.Client whose transport
 	// reuses idle TCP connections across all row deliveries.
 	p := publisher.New(cfg, logger)
 

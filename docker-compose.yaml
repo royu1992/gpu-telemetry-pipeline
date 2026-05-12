@@ -1,1 +1,139 @@
-# TODO
+# GPU Telemetry Pipeline – local development / smoke-test stack.
+#
+# All four application services communicate over the default bridge network.
+# Postgres data is persisted in a named volume so it survives container restarts.
+#
+# Usage:
+#   docker compose up --build          # build images and start all services
+#   docker compose logs -f streamer    # tail streamer logs
+#   docker compose down -v             # stop and delete volumes
+
+services:
+
+  # ── Postgres ────────────────────────────────────────────────────────────────
+  postgres:
+    build:
+      context: .
+      dockerfile: build/postgres/Dockerfile
+    environment:
+      POSTGRES_DB: telemetry
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d telemetry"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Message Queue ───────────────────────────────────────────────────────────
+  message-queue:
+    build:
+      context: .
+      dockerfile: build/message-queue/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      QUEUE_PORT: "8080"
+      QUEUE_CAPACITY: "10000"
+      QUEUE_LEASE_DURATION: "30s"
+      QUEUE_LEASE_REAPER_INTERVAL: "5s"
+      QUEUE_MAX_DELIVERY_ATTEMPTS: "3"
+      QUEUE_BATCH_SIZE: "10"
+      QUEUE_PUBLISH_TIMEOUT: "10s"
+      QUEUE_LONG_POLL_TIMEOUT: "30s"
+      QUEUE_SHUTDOWN_GRACE_PERIOD: "30s"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Collector ───────────────────────────────────────────────────────────────
+  collector:
+    build:
+      context: .
+      dockerfile: build/collector/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      COLLECTOR_PORT: "8082"
+      COLLECTOR_QUEUE_URL: "http://message-queue:8080"
+      COLLECTOR_DATABASE_URL: "postgres://postgres:postgres@postgres:5432/telemetry?sslmode=disable"
+      COLLECTOR_BATCH_SIZE: "10"
+      COLLECTOR_LONG_POLL_TIMEOUT: "30s"
+      COLLECTOR_DB_MAX_CONNS: "5"
+      COLLECTOR_DB_CONNECT_TIMEOUT: "10s"
+      COLLECTOR_ERROR_BACKOFF: "2s"
+      COLLECTOR_SHUTDOWN_GRACE: "30s"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      message-queue:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Streamer ─────────────────────────────────────────────────────────────────
+  streamer:
+    build:
+      context: .
+      dockerfile: build/streamer/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      STREAMER_PORT: "8081"
+      STREAMER_QUEUE_URL: "http://message-queue:8080"
+      STREAMER_CSV_PATH: "/data/dcgm_metrics_20250718_134233.csv"
+      STREAMER_INTERVAL_MS: "100"
+      STREAMER_RETRY_ATTEMPTS: "3"
+      STREAMER_RETRY_DELAY_SECONDS: "2"
+      STREAMER_REQUEST_TIMEOUT_SECONDS: "10"
+      STREAMER_SHUTDOWN_GRACE_SECONDS: "30"
+    volumes:
+      - ./docs/dcgm_metrics_20250718_134233.csv:/data/dcgm_metrics_20250718_134233.csv:ro
+    depends_on:
+      message-queue:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── API Gateway ──────────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: .
+      dockerfile: build/api-gateway/Dockerfile
+    ports:
+      - "9090:9090"
+    environment:
+      GATEWAY_PORT: "9090"
+      GATEWAY_DB_DSN: "postgres://postgres:postgres@postgres:5432/telemetry?sslmode=disable"
+      GATEWAY_DB_MAX_CONNS: "10"
+      GATEWAY_DB_CONNECT_TIMEOUT: "10s"
+      GATEWAY_DB_QUERY_TIMEOUT: "5s"
+      GATEWAY_MAX_RESPONSE_ROWS: "1000"
+      GATEWAY_CACHE_TTL_GPUS: "1m"
+      GATEWAY_CORS_ORIGINS: "*"
+      GATEWAY_SHUTDOWN_GRACE: "30s"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      collector:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

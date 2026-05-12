@@ -1,1 +1,12 @@
-# TODO
+apiVersion: v2
+name: collector
+description: Telemetry Collector for the GPU Telemetry Pipeline
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - gpu
+  - telemetry
+  - collector
+maintainers:
+  - name: royu1992

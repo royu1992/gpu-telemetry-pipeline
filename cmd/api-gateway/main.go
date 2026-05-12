@@ -1,3 +1,9 @@
+// @title           GPU Telemetry Pipeline API
+// @version         1.0
+// @description     REST API for querying GPU telemetry data collected from an AI cluster.
+// @host            localhost:9090
+// @BasePath        /api/v1
+// @schemes         http
 package main
 
 import (

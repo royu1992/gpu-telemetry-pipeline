@@ -1,1 +1,57 @@
-# TODO
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "api-gateway.fullname" . }}
+  labels:
+    {{- include "api-gateway.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "api-gateway.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "api-gateway.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: api-gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: GATEWAY_PORT
+              value: {{ .Values.config.apiPort | quote }}
+            {{- if .Values.db.passwordSecretName }}
+            - name: GATEWAY_DB_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.db.passwordSecretName }}
+                  key: dsn
+            {{- else }}
+            - name: GATEWAY_DB_DSN
+              value: "postgres://{{ .Values.db.user }}:{{ .Values.db.password }}@{{ .Values.db.host }}:{{ .Values.db.port }}/{{ .Values.db.name }}?sslmode=disable"
+            {{- end }}
+            - name: GATEWAY_DB_MAX_CONNS
+              value: {{ .Values.db.maxOpenConns | quote }}
+            - name: GATEWAY_DB_CONNECT_TIMEOUT
+              value: "10s"
+            - name: GATEWAY_DB_QUERY_TIMEOUT
+              value: "5s"
+            - name: GATEWAY_MAX_RESPONSE_ROWS
+              value: "1000"
+            - name: GATEWAY_CACHE_TTL_GPUS
+              value: "1m"
+            - name: GATEWAY_CORS_ORIGINS
+              value: "*"
+            - name: GATEWAY_SHUTDOWN_GRACE
+              value: "30s"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}

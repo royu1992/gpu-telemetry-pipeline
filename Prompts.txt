@@ -77,3 +77,7 @@ Now that we have discussed the architecture for API Gateway, create a comprehens
 yes please do the implementation of the API Gateway service as per the architecture; follow idiomaic Go coding standards, don't write unit tests now
 
 Please write the unit tests for every method/function in every file for api-gateway service. Use table-driven tests. Ensure there is 100% coverage for every block inside every function/method present. Add comments for every step in every function too.
+
+---
+
+Now make all the changes related to the complete build setup for the system, with Detailed Makefile, Dockerfile, docker-compose, k8s manifests, helm charts, kind manifest, as per the requirements of the project, and also detailed and updated README file. Ensure when the system is up with all the components, we can test it as mentioned in the PDF.

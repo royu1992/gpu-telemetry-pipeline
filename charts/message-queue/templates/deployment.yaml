@@ -1,1 +1,60 @@
-# TODO
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "message-queue.fullname" . }}
+  labels:
+    {{- include "message-queue.labels" . | nindent 4 }}
+spec:
+  # The message queue holds all in-flight messages in a single in-memory ring
+  # buffer. Only one replica is supported; horizontal scaling requires a
+  # distributed coordination layer that is out of scope for this exercise.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "message-queue.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "message-queue.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: message-queue
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: QUEUE_PORT
+              value: {{ .Values.config.queuePort | quote }}
+            - name: QUEUE_CAPACITY
+              value: {{ .Values.config.queueCapacity | quote }}
+            - name: QUEUE_LEASE_DURATION
+              value: {{ .Values.config.leaseDuration | quote }}
+            - name: QUEUE_LEASE_REAPER_INTERVAL
+              value: {{ .Values.config.leaseReaperInterval | quote }}
+            - name: QUEUE_MAX_DELIVERY_ATTEMPTS
+              value: {{ .Values.config.maxDeliveryAttempts | quote }}
+            - name: QUEUE_BATCH_SIZE
+              value: {{ .Values.config.batchSize | quote }}
+            - name: QUEUE_PUBLISH_TIMEOUT
+              value: {{ .Values.config.publishTimeout | quote }}
+            - name: QUEUE_LONG_POLL_TIMEOUT
+              value: {{ .Values.config.longPollTimeout | quote }}
+            - name: QUEUE_SHUTDOWN_GRACE_PERIOD
+              value: {{ .Values.config.shutdownGracePeriod | quote }}
+            - name: QUEUE_HTTP_READ_TIMEOUT
+              value: {{ .Values.config.httpReadTimeout | quote }}
+            - name: QUEUE_HTTP_WRITE_TIMEOUT
+              value: {{ .Values.config.httpWriteTimeout | quote }}
+            - name: QUEUE_HTTP_IDLE_TIMEOUT
+              value: {{ .Values.config.httpIdleTimeout | quote }}
+            - name: QUEUE_MAX_REQUEST_BODY_SIZE
+              value: {{ .Values.config.maxRequestBodySize | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}

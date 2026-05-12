@@ -1,1 +1,12 @@
-# TODO
+apiVersion: v2
+name: api-gateway
+description: REST API Gateway for the GPU Telemetry Pipeline
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - gpu
+  - telemetry
+  - api
+maintainers:
+  - name: royu1992

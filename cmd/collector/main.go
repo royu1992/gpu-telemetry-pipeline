@@ -1,3 +1,9 @@
+// @title           GPU Telemetry Pipeline — Collector API
+// @version         1.0
+// @description     Internal health and observability API for the Telemetry Collector service.
+// @host            localhost:8082
+// @BasePath        /
+// @schemes         http
 package main
 
 import (

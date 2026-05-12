@@ -1,0 +1,121 @@
+openapi: "3.0.3"
+info:
+  title: GPU Telemetry Pipeline — Streamer API
+  description: |
+    Internal health and observability API for the Telemetry Streamer service.
+    The Streamer reads GPU metrics from a DCGM CSV file in a continuous loop
+    and publishes each row to the Message Queue.
+
+    Run `make generate-openapi-streamer` to regenerate this file from source annotations.
+  version: "1.0"
+
+servers:
+  - url: http://localhost:8081
+    description: Local docker-compose / kind deployment
+
+tags:
+  - name: operations
+    description: Liveness, readiness, and metrics probes
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      description: Returns 200 while the streamer process is alive.
+      operationId: streamerHealth
+      tags: [operations]
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+              example:
+                status: "ok"
+
+  /ready:
+    get:
+      summary: Readiness probe
+      description: |
+        Returns 200 when the telemetry loop is actively running. Returns 503:
+        - During startup (before the loop goroutine confirms it is running)
+        - During graceful shutdown (after receiving SIGTERM)
+
+        Kubernetes uses this to stop routing traffic to pods that are draining.
+      operationId: streamerReady
+      tags: [operations]
+      responses:
+        "200":
+          description: Telemetry loop is running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+              example:
+                status: "ready"
+        "503":
+          description: Loop not yet started or shutting down
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+              example:
+                status: "not ready"
+
+  /metrics:
+    get:
+      summary: Streamer metrics
+      description: |
+        Returns a JSON snapshot of the streamer's observability counters:
+        - `rows_sent_total` — cumulative rows successfully published to the queue
+        - `errors_total` — cumulative send failures and bad-row skips
+        - `last_sent_timestamp_seconds` — Unix timestamp of the last successful POST
+        - `last_row_read_timestamp_seconds` — Unix timestamp of the last CSV row read
+
+        Diagnostic patterns:
+        - `last_sent_timestamp` stale but `last_row_read_timestamp` advancing → output bottleneck (queue full or unreachable)
+        - Both stale → loop is stuck reading or has exited
+      operationId: streamerMetrics
+      tags: [operations]
+      responses:
+        "200":
+          description: Metrics snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamerMetrics"
+
+components:
+  schemas:
+    StatusResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: "ok"
+
+    StreamerMetrics:
+      type: object
+      properties:
+        rows_sent_total:
+          type: integer
+          format: int64
+          description: Cumulative rows successfully delivered to the message queue.
+          example: 18500
+        errors_total:
+          type: integer
+          format: int64
+          description: Cumulative send failures and bad-row skips.
+          example: 3
+        last_sent_timestamp_seconds:
+          type: number
+          format: double
+          description: Unix timestamp (fractional seconds) of the last successful publish.
+          example: 1753136554.456
+        last_row_read_timestamp_seconds:
+          type: number
+          format: double
+          description: Unix timestamp (fractional seconds) of the last successful CSV row read.
+          example: 1753136554.389

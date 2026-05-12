@@ -1,1 +1,69 @@
-# TODO
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "collector.fullname" . }}
+  labels:
+    {{- include "collector.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.autoscaling.minReplicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "collector.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "collector.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: collector
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: health
+              containerPort: 8082
+              protocol: TCP
+          env:
+            - name: COLLECTOR_PORT
+              value: "8082"
+            - name: COLLECTOR_QUEUE_URL
+              value: {{ .Values.config.queueAddr | quote }}
+            {{- if .Values.db.passwordSecretName }}
+            - name: COLLECTOR_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.db.passwordSecretName }}
+                  key: dsn
+            {{- else }}
+            - name: COLLECTOR_DATABASE_URL
+              value: "postgres://{{ .Values.db.user }}:{{ .Values.db.password }}@{{ .Values.db.host }}:{{ .Values.db.port }}/{{ .Values.db.name }}?sslmode=disable"
+            {{- end }}
+            - name: COLLECTOR_BATCH_SIZE
+              value: {{ .Values.config.batchSize | quote }}
+            - name: COLLECTOR_DB_MAX_CONNS
+              value: {{ .Values.db.maxOpenConns | quote }}
+            - name: COLLECTOR_DB_CONNECT_TIMEOUT
+              value: "10s"
+            - name: COLLECTOR_LONG_POLL_TIMEOUT
+              value: "30s"
+            - name: COLLECTOR_ERROR_BACKOFF
+              value: "2s"
+            - name: COLLECTOR_SHUTDOWN_GRACE
+              value: "30s"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3

@@ -1,3 +1,9 @@
+// @title           GPU Telemetry Pipeline — Message Queue API
+// @version         1.0
+// @description     Custom in-memory ring-buffer message queue. Streamers publish telemetry; Collectors consume and ack.
+// @host            localhost:8080
+// @BasePath        /
+// @schemes         http
 package main
 
 import (

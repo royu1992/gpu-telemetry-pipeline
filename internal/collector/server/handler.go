@@ -60,6 +60,13 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 // handleHealth handles GET /health.
 // Always returns 200 OK with a minimal JSON body while the process is running.
 // Kubernetes uses this as a liveness probe to detect deadlocked or crashed pods.
+//
+// @Summary      Liveness probe
+// @Description  Returns 200 while the collector process is alive.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  map[string]string
+// @Router       /health [get]
 func (h *Handler) handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
@@ -68,6 +75,14 @@ func (h *Handler) handleHealth(c *gin.Context) {
 // Returns 200 OK only when all three startup conditions are satisfied (Postgres
 // pool healthy, schema migration complete, consumption loop running).
 // Returns 503 Service Unavailable during startup and graceful shutdown.
+//
+// @Summary      Readiness probe
+// @Description  Returns 200 when the DB is connected, migration has run, and the consumption loop is active. Returns 503 otherwise.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  map[string]string
+// @Failure      503  {object}  map[string]string
+// @Router       /ready [get]
 func (h *Handler) handleReady(c *gin.Context) {
 	if h.readyFlag.Load() == 1 {
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
@@ -90,6 +105,13 @@ func (h *Handler) handleReady(c *gin.Context) {
 //
 // A stale last_db_write_timestamp while messages_consumed_total grows indicates
 // a DB write-path failure. Both values being stale indicates the loop has stalled.
+//
+// @Summary      Collector metrics
+// @Description  Returns a JSON snapshot of collector counters: messages consumed, DB writes (success/error), validation errors, last write timestamp, and uptime.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  metrics.Snapshot
+// @Router       /metrics [get]
 func (h *Handler) handleMetrics(c *gin.Context) {
 	// Snapshot() atomically collects all counter values and converts
 	// the nanosecond timestamp to fractional seconds for easy consumption.

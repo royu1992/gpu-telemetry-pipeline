@@ -1,6 +1,3 @@
-# TODO
-
-
 image:
   repository: streamer
   tag: latest
@@ -11,10 +8,11 @@ config:
   csvPath:            "/data/dcgm_metrics_20250718_134233.csv"
   emitInterval:       "1s"
   batchSize:          "10"
-  maxRetries:         "5"
+  maxRetries:         "3"
 
-# CSV data is mounted from a ConfigMap or PersistentVolume.
-# Set csvConfigMapName to the name of a ConfigMap containing the CSV data.
+# CSV data is mounted from a ConfigMap created by:
+#   make k8s-create-csv-configmap
+# The key inside the ConfigMap must be dcgm_metrics_20250718_134233.csv
 csvConfigMapName: "telemetry-csv"
 
 # Horizontal Pod Autoscaler — scales streamer pods 1–10 based on CPU.

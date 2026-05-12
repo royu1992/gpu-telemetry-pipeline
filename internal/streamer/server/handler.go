@@ -57,6 +57,13 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 // handleHealth handles GET /health.
 // Always returns 200 OK with a minimal JSON body while the process is running.
 // Kubernetes uses this as a liveness probe to detect deadlocked or crashed pods.
+//
+// @Summary      Liveness probe
+// @Description  Returns 200 while the streamer process is alive.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  map[string]string
+// @Router       /health [get]
 func (h *Handler) handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
@@ -67,6 +74,14 @@ func (h *Handler) handleHealth(c *gin.Context) {
 // graceful shutdown (after SetReady(false) is called). Kubernetes uses this as
 // a readiness probe to stop routing traffic to pods that are not yet ready or
 // that are draining.
+//
+// @Summary      Readiness probe
+// @Description  Returns 200 when the telemetry loop is actively running. Returns 503 during startup and graceful shutdown.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  map[string]string
+// @Failure      503  {object}  map[string]string
+// @Router       /ready [get]
 func (h *Handler) handleReady(c *gin.Context) {
 	if h.readyFlag.Load() == 1 {
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
@@ -89,6 +104,13 @@ func (h *Handler) handleReady(c *gin.Context) {
 // A stale last_sent_timestamp while last_row_read_timestamp advances indicates
 // an output bottleneck (queue unreachable or full). Both timestamps being stale
 // indicates the loop is stuck reading or has exited.
+//
+// @Summary      Streamer metrics
+// @Description  Returns a JSON snapshot of streamer counters: rows sent, errors, last sent timestamp, and last row-read timestamp.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  metrics.Snapshot
+// @Router       /metrics [get]
 func (h *Handler) handleMetrics(c *gin.Context) {
 	// Snapshot() collects all four atomic values in a single call and converts
 	// nanosecond timestamps to fractional seconds for easy consumption.

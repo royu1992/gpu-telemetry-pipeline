@@ -64,6 +64,19 @@ func (h *MessageQueueHandler) RegisterRoutes(r *gin.Engine) {
 
 // handlePublish handles POST /messages.
 // Accepts a telemetry message from a Streamer and places it on the queue.
+//
+// @Summary      Publish a telemetry message
+// @Description  Enqueues a single GPU telemetry data point. Blocks until a slot is free or the publish timeout elapses.
+// @Tags         messages
+// @Accept       json
+// @Produce      json
+// @Param        message  body      message_queue.PublishRequest   true  "Telemetry message to enqueue"
+// @Success      201      {object}  message_queue.PublishResponse  "Message accepted; returns the assigned message_id"
+// @Failure      400      {object}  message_queue.ErrorResponse    "Missing or invalid request body"
+// @Failure      429      {object}  message_queue.ErrorResponse    "Queue is full; retry with backoff"
+// @Failure      503      {object}  message_queue.ErrorResponse    "Queue is shutting down"
+// @Failure      500      {object}  message_queue.ErrorResponse    "Internal error"
+// @Router       /messages [post]
 func (h *MessageQueueHandler) handlePublish(c *gin.Context) {
 	// Reject incoming messages during graceful shutdown so the Streamer backs
 	// off and retries against a healthy pod.
@@ -121,6 +134,19 @@ func (h *MessageQueueHandler) handlePublish(c *gin.Context) {
 
 // handleConsume handles GET /messages/consume.
 // Performs a long poll: blocks until messages are available or timeout elapses.
+//
+// @Summary      Consume messages (long poll)
+// @Description  Long-polls for up to `long_poll_timeout` seconds. Returns up to `batch_size` messages leased to `consumer_id`. Returns 204 on timeout with no messages.
+// @Tags         messages
+// @Produce      json
+// @Param        consumer_id       query     string  true   "Unique identifier for this consumer instance (typically pod hostname)"
+// @Param        batch_size        query     int     false  "Maximum number of messages to return (default: server-configured batch size)"
+// @Param        long_poll_timeout query     string  false  "Maximum wait duration, e.g. 30s (default: server-configured value)"
+// @Success      200               {object}  message_queue.ConsumeResponse  "One or more messages leased to the caller"
+// @Success      204               "Long-poll timed out; no messages available — poll again immediately"
+// @Failure      400               {object}  message_queue.ErrorResponse    "consumer_id missing"
+// @Failure      503               {object}  message_queue.ErrorResponse    "Queue is shutting down"
+// @Router       /messages/consume [get]
 func (h *MessageQueueHandler) handleConsume(c *gin.Context) {
 	// Reject new poll requests during graceful shutdown.
 	if h.closing.Load() {
@@ -188,6 +214,17 @@ func (h *MessageQueueHandler) handleConsume(c *gin.Context) {
 
 // handleAck handles POST /messages/ack.
 // Processes a batch of delivery acknowledgments from a Collector.
+//
+// @Summary      Acknowledge messages
+// @Description  Marks delivered messages as processed. Returns 207 Multi-Status if any delivery_id was rejected (expired lease, wrong consumer, or unknown ID).
+// @Tags         messages
+// @Accept       json
+// @Produce      json
+// @Param        ack  body      message_queue.AckRequest  true  "Consumer ID and list of delivery IDs to acknowledge"
+// @Success      200  {object}  message_queue.AckResult   "All messages acknowledged"
+// @Success      207  {object}  message_queue.AckResult   "Partial success; check rejected_ids"
+// @Failure      400  {object}  message_queue.ErrorResponse "Invalid request body"
+// @Router       /messages/ack [post]
 func (h *MessageQueueHandler) handleAck(c *gin.Context) {
 	// Parse and validate the request body. Gin binding enforces required fields.
 	var req message_queue.AckRequest
@@ -233,6 +270,13 @@ func (h *MessageQueueHandler) handleAck(c *gin.Context) {
 
 // handleHealth handles GET /health — Kubernetes liveness probe.
 // Returns 200 as long as the process is alive.
+//
+// @Summary      Liveness probe
+// @Description  Returns 200 while the process is alive. Used by Kubernetes as a liveness probe.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  message_queue.HealthResponse
+// @Router       /health [get]
 func (h *MessageQueueHandler) handleHealth(c *gin.Context) {
 	// Always return 200 while the process is running. The liveness probe does
 	// not reflect queue load or readiness — only that the process is alive.
@@ -243,6 +287,14 @@ func (h *MessageQueueHandler) handleHealth(c *gin.Context) {
 
 // handleReady handles GET /ready — Kubernetes readiness probe.
 // Returns 503 during startup initialisation and graceful shutdown.
+//
+// @Summary      Readiness probe
+// @Description  Returns 200 when the queue is ready to serve traffic, including live queue depth and capacity. Returns 503 during shutdown.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  message_queue.ReadyResponse
+// @Failure      503  {object}  message_queue.ReadyResponse
+// @Router       /ready [get]
 func (h *MessageQueueHandler) handleReady(c *gin.Context) {
 	// Return 503 if the service is shutting down, causing the Kubernetes
 	// readiness probe to remove this pod from the load balancer rotation.
@@ -265,6 +317,13 @@ func (h *MessageQueueHandler) handleReady(c *gin.Context) {
 }
 
 // handleMetrics handles GET /metrics — queue statistics endpoint.
+//
+// @Summary      Queue metrics
+// @Description  Returns a JSON snapshot of queue counters (published, acked, redelivered, dropped) and live state (depth, capacity, in-flight).
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  message_queue.Snapshot
+// @Router       /metrics [get]
 func (h *MessageQueueHandler) handleMetrics(c *gin.Context) {
 	// Collect a consistent point-in-time snapshot of counters and live queue
 	// state in a single call to avoid skew between separate reads.

@@ -1,0 +1,134 @@
+openapi: "3.0.3"
+info:
+  title: GPU Telemetry Pipeline — Collector API
+  description: |
+    Internal health and observability API for the Telemetry Collector service.
+    The Collector consumes messages from the Message Queue, validates them, and
+    bulk-inserts them into PostgreSQL.
+
+    Run `make generate-openapi-collector` to regenerate this file from source annotations.
+  version: "1.0"
+
+servers:
+  - url: http://localhost:8082
+    description: Local docker-compose / kind deployment
+
+tags:
+  - name: operations
+    description: Liveness, readiness, and metrics probes
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      description: Returns 200 while the collector process is alive. Kubernetes restarts the pod if this endpoint becomes unreachable.
+      operationId: collectorHealth
+      tags: [operations]
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+              example:
+                status: "ok"
+
+  /ready:
+    get:
+      summary: Readiness probe
+      description: |
+        Returns 200 only when all three startup conditions are satisfied:
+        1. PostgreSQL connection pool is healthy
+        2. Schema migration (`CREATE TABLE IF NOT EXISTS`) has completed
+        3. Consumption loop goroutine is running
+
+        Returns 503 during startup and during graceful shutdown. Kubernetes
+        stops routing traffic to the pod while this returns non-2xx.
+      operationId: collectorReady
+      tags: [operations]
+      responses:
+        "200":
+          description: Collector is fully operational
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+              example:
+                status: "ready"
+        "503":
+          description: Collector is starting up or shutting down
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+              example:
+                status: "not ready"
+
+  /metrics:
+    get:
+      summary: Collector metrics
+      description: |
+        Returns a JSON snapshot of the collector's observability counters:
+        - `messages_consumed_total` — cumulative messages pulled from the queue
+        - `db_writes_success_total` — cumulative successful bulk-insert batches
+        - `db_writes_error_total` — cumulative failed bulk-insert batches (triggers re-delivery)
+        - `validation_errors_total` — individual messages dropped due to parse errors
+        - `last_db_write_timestamp_seconds` — Unix timestamp of the last successful write
+        - `uptime_seconds` — seconds since process start
+
+        Diagnostic pattern: if `messages_consumed_total` grows but
+        `last_db_write_timestamp_seconds` is stale, the DB write path has failed.
+      operationId: collectorMetrics
+      tags: [operations]
+      responses:
+        "200":
+          description: Metrics snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectorMetrics"
+
+components:
+  schemas:
+    StatusResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: "ok"
+
+    CollectorMetrics:
+      type: object
+      properties:
+        messages_consumed_total:
+          type: integer
+          format: int64
+          description: Cumulative messages pulled from the queue.
+          example: 4200
+        db_writes_success_total:
+          type: integer
+          format: int64
+          description: Cumulative successful bulk-insert batches committed to Postgres.
+          example: 420
+        db_writes_error_total:
+          type: integer
+          format: int64
+          description: Cumulative failed bulk-insert batches. Non-zero means re-deliveries will occur.
+          example: 0
+        validation_errors_total:
+          type: integer
+          format: int64
+          description: Individual messages dropped due to missing fields or parse errors.
+          example: 0
+        last_db_write_timestamp_seconds:
+          type: number
+          format: double
+          description: Unix timestamp (fractional seconds) of the last successful Postgres commit.
+          example: 1753136554.123
+        uptime_seconds:
+          type: integer
+          format: int64
+          description: Seconds elapsed since the collector process started.
+          example: 3600

@@ -1,1 +1,254 @@
-# TODO
+openapi: "3.0.3"
+info:
+  title: GPU Telemetry Pipeline API
+  description: |
+    REST API for querying GPU telemetry data collected from an AI cluster.
+
+    The data is ingested by the **Telemetry Streamer** → **Message Queue** →
+    **Telemetry Collector** pipeline and stored in PostgreSQL. This gateway
+    exposes a read-only view of the stored metrics.
+
+    Run `make generate-openapi` to regenerate this file from source annotations.
+  version: "1.0"
+  contact:
+    name: royu1992
+
+servers:
+  - url: http://localhost:9090/api/v1
+    description: Local docker-compose / kind deployment
+
+tags:
+  - name: gpus
+    description: GPU discovery and telemetry queries
+
+paths:
+  /gpus:
+    get:
+      summary: List all GPUs
+      description: |
+        Returns a list of all GPUs for which telemetry data is available.
+        The result is served from an in-memory cache that refreshes according
+        to the `GATEWAY_CACHE_TTL_GPUS` configuration value (default 1 minute).
+      operationId: listGPUs
+      tags: [gpus]
+      responses:
+        "200":
+          description: Array of GPU summaries (empty array if no data has arrived yet)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GPUSummary"
+              example:
+                - id: "GPU-5fd4f087-86f3-7a43-b711-4771313afc50"
+                  hostname: "mtv5-dgx1-hgpu-031"
+                  gpu_id: "0"
+                  model_name: "NVIDIA H100 80GB HBM3"
+                - id: "GPU-bc7a12ab-4998-fdc5-0785-2678a929a142"
+                  hostname: "mtv5-dgx1-hgpu-031"
+                  gpu_id: "1"
+                  model_name: "NVIDIA H100 80GB HBM3"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /gpus/{id}/telemetry:
+    get:
+      summary: Get GPU telemetry
+      description: |
+        Returns telemetry entries for a specific GPU identified by its hardware
+        UUID, ordered by timestamp ascending.
+
+        Time window filters are **inclusive** on both ends. If omitted, the
+        default window is the last hour.
+
+        The response is capped at `GATEWAY_MAX_RESPONSE_ROWS` rows (default 1000).
+        Use `start_time` / `end_time` to page through larger datasets.
+      operationId: getGPUTelemetry
+      tags: [gpus]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: |
+            GPU hardware UUID as returned by `GET /api/v1/gpus`.
+            Example: `GPU-5fd4f087-86f3-7a43-b711-4771313afc50`
+          schema:
+            type: string
+            example: "GPU-5fd4f087-86f3-7a43-b711-4771313afc50"
+        - name: start_time
+          in: query
+          required: false
+          description: |
+            Inclusive lower bound of the time window (RFC3339 format).
+            Default: one hour before the request is received.
+          schema:
+            type: string
+            format: date-time
+            example: "2025-07-18T20:00:00Z"
+        - name: end_time
+          in: query
+          required: false
+          description: |
+            Inclusive upper bound of the time window (RFC3339 format).
+            Default: the time the request is received.
+          schema:
+            type: string
+            format: date-time
+            example: "2025-07-18T21:00:00Z"
+      responses:
+        "200":
+          description: Telemetry response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelemetryResponse"
+              example:
+                id: "GPU-5fd4f087-86f3-7a43-b711-4771313afc50"
+                count: 2
+                data:
+                  - timestamp: "2025-07-18T20:42:34Z"
+                    metric_name: "DCGM_FI_DEV_GPU_UTIL"
+                    value: 0
+                    hostname: "mtv5-dgx1-hgpu-031"
+                    gpu_id: "0"
+                    model_name: "NVIDIA H100 80GB HBM3"
+                  - timestamp: "2025-07-18T20:42:44Z"
+                    metric_name: "DCGM_FI_DEV_GPU_UTIL"
+                    value: 12.5
+                    hostname: "mtv5-dgx1-hgpu-031"
+                    gpu_id: "0"
+                    model_name: "NVIDIA H100 80GB HBM3"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+components:
+  schemas:
+    GPUSummary:
+      type: object
+      description: Identifies a single GPU within the cluster.
+      required: [id, hostname, gpu_id, model_name]
+      properties:
+        id:
+          type: string
+          description: |
+            Hardware UUID uniquely identifying the GPU across all hosts.
+            Pass this value as the `{id}` path parameter to query telemetry.
+          example: "GPU-5fd4f087-86f3-7a43-b711-4771313afc50"
+        hostname:
+          type: string
+          description: Hostname of the node that contains this GPU.
+          example: "mtv5-dgx1-hgpu-031"
+        gpu_id:
+          type: string
+          description: Ordinal index of the GPU on its host (0-based).
+          example: "0"
+        model_name:
+          type: string
+          description: GPU product name as reported by DCGM.
+          example: "NVIDIA H100 80GB HBM3"
+
+    TelemetryEntry:
+      type: object
+      description: A single time-series metric reading for a GPU.
+      required: [timestamp, metric_name, value, hostname, gpu_id, model_name]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: RFC3339 timestamp when the metric was recorded.
+          example: "2025-07-18T20:42:34Z"
+        metric_name:
+          type: string
+          description: DCGM metric name.
+          example: "DCGM_FI_DEV_GPU_UTIL"
+        value:
+          type: number
+          format: double
+          description: Metric value.
+          example: 72.5
+        hostname:
+          type: string
+          description: Hostname of the originating node.
+          example: "mtv5-dgx1-hgpu-031"
+        gpu_id:
+          type: string
+          description: Ordinal GPU index on the originating node.
+          example: "0"
+        model_name:
+          type: string
+          description: GPU product name.
+          example: "NVIDIA H100 80GB HBM3"
+
+    TelemetryResponse:
+      type: object
+      description: Paginated telemetry result for a single GPU.
+      required: [id, count, data]
+      properties:
+        id:
+          type: string
+          description: GPU hardware UUID that was queried.
+          example: "GPU-5fd4f087-86f3-7a43-b711-4771313afc50"
+        count:
+          type: integer
+          description: Number of entries returned in this response.
+          example: 2
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryEntry"
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Human-readable error description.
+          example: "GPU not found"
+
+  responses:
+    BadRequest:
+      description: The request was malformed (e.g., invalid time format or start_time > end_time).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: The requested GPU UUID is not present in the database.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalError:
+      description: An unexpected server-side error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    ServiceUnavailable:
+      description: The database connection is not yet established or is unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    GatewayTimeout:
+      description: The database query exceeded the configured timeout.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

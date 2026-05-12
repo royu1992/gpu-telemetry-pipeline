@@ -1,6 +1,3 @@
-# TODO
-
-
 image:
   repository: collector
   tag: latest
@@ -15,13 +12,13 @@ db:
   host:               "postgres"
   port:               "5432"
   name:               "telemetry"
-  user:               "telemetry"
+  user:               "postgres"
+  password:           "postgres"
   # Password should come from a Kubernetes Secret in production.
   # Set db.passwordSecretName to reference an existing Secret.
-  password:           "telemetry"
   passwordSecretName: ""
-  maxOpenConns:       "10"
-  maxIdleConns:       "5"
+  maxOpenConns:       "5"
+  maxIdleConns:       "3"
   connMaxLifetime:    "5m"
 
 # Horizontal Pod Autoscaler — scales collector pods 1–10 based on CPU.

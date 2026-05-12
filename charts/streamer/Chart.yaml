@@ -1,1 +1,12 @@
-# TODO
+apiVersion: v2
+name: streamer
+description: Telemetry Streamer for the GPU Telemetry Pipeline
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - gpu
+  - telemetry
+  - streamer
+maintainers:
+  - name: royu1992

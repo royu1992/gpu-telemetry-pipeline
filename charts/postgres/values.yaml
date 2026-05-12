@@ -1,0 +1,40 @@
+image:
+  repository: postgres
+  tag: "16-alpine"
+  pullPolicy: IfNotPresent
+
+auth:
+  database: telemetry
+  username: postgres
+  password: postgres
+
+service:
+  type: ClusterIP
+  port: 5432
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""   # "" uses the cluster default StorageClass
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  exec:
+    command: ["pg_isready", "-U", "postgres", "-d", "telemetry"]
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  failureThreshold: 5
+
+readinessProbe:
+  exec:
+    command: ["pg_isready", "-U", "postgres", "-d", "telemetry"]
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3

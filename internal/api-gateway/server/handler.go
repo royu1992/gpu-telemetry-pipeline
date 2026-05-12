@@ -109,6 +109,13 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 // handleHealth responds with HTTP 200 and a static JSON body. It is intended
 // for liveness checks that simply verify the process is alive and able to
 // accept connections. It never fails once the server is running.
+//
+// @Summary      Liveness probe
+// @Description  Returns 200 while the api-gateway process is alive.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  map[string]string
+// @Router       /health [get]
 func (h *Handler) handleHealth(c *gin.Context) {
 	// Always OK — if the process is reachable, it is alive.
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -117,6 +124,14 @@ func (h *Handler) handleHealth(c *gin.Context) {
 // handleReady responds with HTTP 200 when the gateway is ready to serve API
 // traffic (i.e., the database connection has been established), or HTTP 503
 // while the store is still connecting or unavailable.
+//
+// @Summary      Readiness probe
+// @Description  Returns 200 when the database connection is established. Returns 503 during startup or when the DB is unavailable.
+// @Tags         operations
+// @Produce      json
+// @Success      200  {object}  map[string]string
+// @Failure      503  {object}  map[string]string
+// @Router       /ready [get]
 func (h *Handler) handleReady(c *gin.Context) {
 	// Read the atomic flag set by SetReady.
 	if h.ready.Load() == 1 {
@@ -129,6 +144,13 @@ func (h *Handler) handleReady(c *gin.Context) {
 
 // handleMetrics renders all gateway observability counters as plain text in
 // the "key: value\n" format consistent with other services in the pipeline.
+//
+// @Summary      Gateway metrics
+// @Description  Returns plain-text observability counters: requests total, success, error, cache hits/misses, and DB query errors.
+// @Tags         operations
+// @Produce      text/plain
+// @Success      200  {string}  string
+// @Router       /metrics [get]
 func (h *Handler) handleMetrics(c *gin.Context) {
 	// Format returns a pre-allocated string; no error path.
 	c.String(http.StatusOK, h.metrics.Snapshot().Format())
@@ -144,6 +166,15 @@ func (h *Handler) handleMetrics(c *gin.Context) {
 // The array is always present (may be empty); it is never null.
 //
 //	[{"id":"GPU-uuid","hostname":"node","gpu_id":"0","model_name":"NVIDIA H100"}]
+//
+// @Summary      List all GPUs
+// @Description  Returns a list of all GPUs for which telemetry data is available, served from an in-memory cache.
+// @Tags         gpus
+// @Produce      json
+// @Success      200  {array}   store.GPUSummary  "List of GPU summaries"
+// @Failure      500  {object}  map[string]string "Internal server error"
+// @Failure      503  {object}  map[string]string "Service unavailable"
+// @Router       /gpus [get]
 func (h *Handler) handleListGPUs(c *gin.Context) {
 	// Count every inbound request for observability.
 	h.metrics.IncRequests()
@@ -194,6 +225,21 @@ func (h *Handler) handleListGPUs(c *gin.Context) {
 //	504 – database query timed out.
 //	503 – database unavailable.
 //	500 – unexpected error.
+//
+// @Summary      Get GPU telemetry
+// @Description  Returns telemetry entries for a specific GPU ordered by timestamp. Supports optional RFC3339 time window filters.
+// @Tags         gpus
+// @Produce      json
+// @Param        id         path   string  true   "GPU hardware UUID (e.g. GPU-5fd4f087-86f3-7a43-b711-4771313afc50)"
+// @Param        start_time query  string  false  "Start of the time window, RFC3339 format, inclusive. Default: 1 hour ago."
+// @Param        end_time   query  string  false  "End of the time window, RFC3339 format, inclusive. Default: now."
+// @Success      200  {object}  map[string]interface{}  "Telemetry response with id, count, and data array"
+// @Failure      400  {object}  map[string]string       "Bad request – invalid time format or start > end"
+// @Failure      404  {object}  map[string]string       "GPU not found"
+// @Failure      500  {object}  map[string]string       "Internal server error"
+// @Failure      503  {object}  map[string]string       "Service unavailable"
+// @Failure      504  {object}  map[string]string       "Gateway timeout"
+// @Router       /gpus/{id}/telemetry [get]
 func (h *Handler) handleGetTelemetry(c *gin.Context) {
 	// Count every inbound request for observability.
 	h.metrics.IncRequests()

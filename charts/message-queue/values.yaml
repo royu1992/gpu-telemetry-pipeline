@@ -1,6 +1,3 @@
-# TODO
-
-
 image:
   repository: message-queue
   tag: latest

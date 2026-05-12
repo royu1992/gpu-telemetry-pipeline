@@ -1,8 +1,8 @@
-{{- define "streamer.name" -}}
+{{- define "postgres.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{- define "streamer.fullname" -}}
+{{- define "postgres.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -15,17 +15,17 @@
 {{- end }}
 {{- end }}
 
-{{- define "streamer.chart" -}}
+{{- define "postgres.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{- define "streamer.labels" -}}
-helm.sh/chart: {{ include "streamer.chart" . }}
-{{ include "streamer.selectorLabels" . }}
+{{- define "postgres.labels" -}}
+helm.sh/chart: {{ include "postgres.chart" . }}
+{{ include "postgres.selectorLabels" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
-{{- define "streamer.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "streamer.name" . }}
+{{- define "postgres.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "postgres.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}

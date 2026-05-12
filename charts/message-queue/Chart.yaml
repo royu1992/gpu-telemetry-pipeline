@@ -1,1 +1,12 @@
-# TODO
+apiVersion: v2
+name: message-queue
+description: Custom in-memory Message Queue for the GPU Telemetry Pipeline
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - gpu
+  - telemetry
+  - message-queue
+maintainers:
+  - name: royu1992

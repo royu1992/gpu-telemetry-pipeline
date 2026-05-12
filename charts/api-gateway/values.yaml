@@ -1,13 +1,13 @@
-# TODO
-
-
 image:
   repository: api-gateway
   tag: latest
   pullPolicy: IfNotPresent
 
 service:
-  type: ClusterIP
+  # Use NodePort when running on kind so the API is reachable from the host
+  # via the extraPortMapping declared in kind-config.yaml (host:9090 →
+  # nodePort:30090).
+  type: NodePort
   port: 9090
 
 config:
@@ -17,8 +17,8 @@ db:
   host:               "postgres"
   port:               "5432"
   name:               "telemetry"
-  user:               "telemetry"
-  password:           "telemetry"
+  user:               "postgres"
+  password:           "postgres"
   passwordSecretName: ""
   maxOpenConns:       "10"
   maxIdleConns:       "5"

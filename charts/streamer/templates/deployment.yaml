@@ -1,1 +1,67 @@
-# TODO
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "streamer.fullname" . }}
+  labels:
+    {{- include "streamer.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.autoscaling.minReplicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "streamer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "streamer.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: streamer
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: STREAMER_PORT
+              value: "8081"
+            - name: STREAMER_QUEUE_URL
+              value: {{ .Values.config.queueAddr | quote }}
+            - name: STREAMER_CSV_PATH
+              value: {{ .Values.config.csvPath | quote }}
+            - name: STREAMER_INTERVAL_MS
+              value: "100"
+            - name: STREAMER_RETRY_ATTEMPTS
+              value: {{ .Values.config.maxRetries | quote }}
+            - name: STREAMER_RETRY_DELAY_SECONDS
+              value: "2"
+            - name: STREAMER_REQUEST_TIMEOUT_SECONDS
+              value: "10"
+            - name: STREAMER_SHUTDOWN_GRACE_SECONDS
+              value: "30"
+          volumeMounts:
+            - name: csv-data
+              mountPath: /data
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+      volumes:
+        - name: csv-data
+          configMap:
+            name: {{ .Values.csvConfigMapName }}
