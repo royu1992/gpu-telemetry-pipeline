@@ -66,3 +66,14 @@ Okay now Let's discuss each problem we need to solve in the Collector service. L
 Now that we have discussed the architecture for Collector, create a comprehensive and detailed document for the Collector service (named streamer in Kubernetes.). It should contain everything we have discussed regarding the Colelctor service explained in detail, and easy for anyone to understand.
 
 Please write the unit tests for every method/function in every file for collector service. Use table-driven tests. Ensure there is 100% coverage for every block inside every function/method present. Add comments for every step in every function too.
+
+---
+
+Okay now Let's discuss each problem we need to solve in the API Gateway service. Let's take one point at a time, discuss and finalise it, and then move on to the next one.
+NOTE: Go through the implementation and architecture docs of the other 3 components before moving forward with api-gateway.
+
+Now that we have discussed the architecture for API Gateway, create a comprehensive and detailed document for the API Gateway service (named api-gateway in Kubernetes.). It should contain everything we have discussed regarding the API Gateway service explained in detail, and easy for anyone to understand.
+
+yes please do the implementation of the API Gateway service as per the architecture; follow idiomaic Go coding standards, don't write unit tests now
+
+Please write the unit tests for every method/function in every file for api-gateway service. Use table-driven tests. Ensure there is 100% coverage for every block inside every function/method present. Add comments for every step in every function too.

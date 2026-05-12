@@ -13,7 +13,7 @@ import (
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/consumer"
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/metrics"
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/server"
-	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/store"
+	"github.com/royu1992/gpu-telemetry-pipeline/internal/store"
 )
 
 func main() {
@@ -81,7 +81,11 @@ func main() {
 
 	// Step 1: Establish the Postgres connection pool.
 	// The connect timeout is enforced inside store.New via context.WithTimeout.
-	dbStore, err := store.New(context.Background(), cfg)
+	dbStore, err := store.New(context.Background(), store.Config{
+		DatabaseURL:      cfg.DatabaseURL,
+		DBMaxConns:       cfg.DBMaxConns,
+		DBConnectTimeout: cfg.DBConnectTimeout,
+	})
 	if err != nil {
 		logger.Error("failed to connect to database", "err", err)
 		os.Exit(1)

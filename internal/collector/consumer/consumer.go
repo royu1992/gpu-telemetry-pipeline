@@ -16,8 +16,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/config"
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/metrics"
-	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/store"
 	mq "github.com/royu1992/gpu-telemetry-pipeline/internal/message_queue/model"
+	store "github.com/royu1992/gpu-telemetry-pipeline/internal/store"
 )
 
 // Consumer manages the full poll → validate → persist → ACK lifecycle.

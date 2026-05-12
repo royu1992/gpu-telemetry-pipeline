@@ -16,9 +16,9 @@ import (
 
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/config"
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/metrics"
-	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/store"
 	mq "github.com/royu1992/gpu-telemetry-pipeline/internal/message_queue/model"
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/model"
+	store "github.com/royu1992/gpu-telemetry-pipeline/internal/store"
 )
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
