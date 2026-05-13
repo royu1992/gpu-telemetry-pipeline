@@ -355,10 +355,10 @@ func TestHandleReady_NotReady(t *testing.T) {
 	if w.Code != http.StatusServiceUnavailable {
 		t.Errorf("expected 503, got %d", w.Code)
 	}
-	var resp message_queue.ReadyResponse
+	var resp map[string]string
 	json.NewDecoder(w.Body).Decode(&resp)
-	if resp.Status != "not ready" {
-		t.Errorf("expected 'not ready', got %s", resp.Status)
+	if resp["error"] != "queue is shutting down" {
+		t.Errorf("expected 'queue is shutting down', got %s", resp["error"])
 	}
 }
 

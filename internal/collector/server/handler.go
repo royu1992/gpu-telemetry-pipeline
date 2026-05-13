@@ -5,7 +5,10 @@ import (
 	"sync/atomic"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/royu1992/gpu-telemetry-pipeline/docs/api/collector"
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/collector/metrics"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // Handler registers the collector's three operational HTTP endpoints:
@@ -55,6 +58,10 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	r.GET("/ready", h.handleReady)
 	// JSON metrics snapshot for dashboards and alerting.
 	r.GET("/metrics", h.handleMetrics)
+
+	// Swagger UI documentation endpoint for the Collector internal API.
+	r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
+		ginSwagger.InstanceName("openapi_collector")))
 }
 
 // handleHealth handles GET /health.
@@ -65,10 +72,10 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 // @Description  Returns 200 while the collector process is alive.
 // @Tags         operations
 // @Produce      json
-// @Success      200  {object}  map[string]string
+// @Success      200  {object}  HealthResponse
 // @Router       /health [get]
 func (h *Handler) handleHealth(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	c.JSON(http.StatusOK, HealthResponse{Status: "ok"})
 }
 
 // handleReady handles GET /ready.
@@ -80,15 +87,15 @@ func (h *Handler) handleHealth(c *gin.Context) {
 // @Description  Returns 200 when the DB is connected, migration has run, and the consumption loop is active. Returns 503 otherwise.
 // @Tags         operations
 // @Produce      json
-// @Success      200  {object}  map[string]string
-// @Failure      503  {object}  map[string]string
+// @Success      200  {object}  ReadyResponse
+// @Failure      503  {object}  ErrorResponse
 // @Router       /ready [get]
 func (h *Handler) handleReady(c *gin.Context) {
 	if h.readyFlag.Load() == 1 {
-		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+		c.JSON(http.StatusOK, ReadyResponse{Status: "ready"})
 		return
 	}
-	c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready"})
+	c.JSON(http.StatusServiceUnavailable, ErrorResponse{Error: "not ready"})
 }
 
 // handleMetrics handles GET /metrics.

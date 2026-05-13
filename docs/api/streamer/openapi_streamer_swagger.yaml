@@ -1,0 +1,86 @@
+basePath: /
+definitions:
+  metrics.Snapshot:
+    properties:
+      errors_total:
+        type: integer
+      last_row_read_timestamp_seconds:
+        type: number
+      last_sent_timestamp_seconds:
+        type: number
+      rows_sent_total:
+        type: integer
+    type: object
+  server.ErrorResponse:
+    properties:
+      error:
+        example: error message
+        type: string
+    type: object
+  server.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  server.ReadyResponse:
+    properties:
+      status:
+        example: ready
+        type: string
+    type: object
+host: localhost:8081
+info:
+  contact: {}
+  description: Internal health and observability API for the Telemetry Streamer service.
+  title: GPU Telemetry Pipeline — Streamer API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Returns 200 while the streamer process is alive.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.HealthResponse'
+      summary: Liveness probe
+      tags:
+      - operations
+  /metrics:
+    get:
+      description: 'Returns a JSON snapshot of streamer counters: rows sent, errors,
+        last sent timestamp, and last row-read timestamp.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/metrics.Snapshot'
+      summary: Streamer metrics
+      tags:
+      - operations
+  /ready:
+    get:
+      description: Returns 200 when the telemetry loop is actively running. Returns
+        503 during startup and graceful shutdown.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.ReadyResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Readiness probe
+      tags:
+      - operations
+schemes:
+- http
+swagger: "2.0"

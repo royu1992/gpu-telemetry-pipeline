@@ -47,9 +47,10 @@ The API Gateway (Kubernetes service: `api-gateway`) is the **read-facing** servi
 │  ┌──────────────────────────────────────────────────┐    │
 │  │  Gin HTTP Server (:8083)                         │    │
 │  │                                                  │    │
-│  │  GET /api/v1/gpus                                │    │
-│  │  GET /api/v1/gpus/{id}/telemetry                 │    │
+│  │  GET /gpus                                │    │
+│  │  GET /gpus/{id}/telemetry                 │    │
 │  │  GET /health  GET /ready  GET /metrics           │    │
+│  │  GET /docs/index.html                         │    │
 │  └───────────────────────┬──────────────────────────┘    │
 │                          │                               │
 │              ┌───────────▼───────────┐                   │
@@ -98,7 +99,7 @@ The API Gateway is **strictly read-only**. It connects to the same Postgres data
 
 The API Gateway exposes the following endpoints as required by the project specification:
 
-### `GET /api/v1/gpus`
+### `GET /gpus`
 
 Returns the list of all unique GPUs for which telemetry data is currently stored in the database.
 
@@ -126,12 +127,12 @@ Returns the list of all unique GPUs for which telemetry data is currently stored
 
 ---
 
-### `GET /api/v1/gpus/{id}/telemetry`
+### `GET /gpus/{id}/telemetry`
 
 Returns all telemetry entries for a specific GPU, ordered by time ascending.
 
 **Path Parameter:**
-- `{id}`: The hardware `uuid` of the GPU (e.g., `GPU-5fd4f087-86f3-7a43-b711-4771313afc50`). Callers discover this value from `GET /api/v1/gpus`.
+- `{id}`: The hardware `uuid` of the GPU (e.g., `GPU-5fd4f087-86f3-7a43-b711-4771313afc50`). Callers discover this value from `GET /gpus`.
 
 **Optional Query Parameters:**
 - `start_time`: RFC3339 timestamp (inclusive). Default: 1 hour before the current time.
@@ -139,8 +140,8 @@ Returns all telemetry entries for a specific GPU, ordered by time ascending.
 
 **Example Requests:**
 ```
-GET /api/v1/gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry
-GET /api/v1/gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry?start_time=2025-07-18T20:00:00Z&end_time=2025-07-18T21:00:00Z
+GET /gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry
+GET /gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry?start_time=2025-07-18T20:00:00Z&end_time=2025-07-18T21:00:00Z
 ```
 
 **Response**: `200 OK` with a wrapped JSON object (see Section 7).
@@ -154,6 +155,7 @@ GET /api/v1/gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry?start_time=2
 | `GET /health` | Always returns `200 OK`. Used by Kubernetes liveness probe. |
 | `GET /ready` | Returns `200 OK` only if the DB connection is alive. Used by Kubernetes readiness probe. |
 | `GET /metrics` | Returns plain-text atomic counters (request totals, cache hits, DB errors). |
+| `GET /docs/index.html` | Serves the interactive Swagger UI for the API Gateway OpenAPI spec. |
 
 ---
 
@@ -168,7 +170,7 @@ The DCGM telemetry CSV (and thus the `gpu_metrics` table) contains two identity 
 
 ### Why Not `gpu_id`?
 
-If we used `gpu_id` as the API identifier, `GET /api/v1/gpus/0/telemetry` would return a mixed dataset of telemetry from **every node's first GPU** — a semantically incorrect result when the goal is querying "a specific GPU", as required by the project specification.
+If we used `gpu_id` as the API identifier, `GET /gpus/0/telemetry` would return a mixed dataset of telemetry from **every node's first GPU** — a semantically incorrect result when the goal is querying "a specific GPU", as required by the project specification.
 
 ### Why `uuid`?
 
@@ -178,7 +180,7 @@ The `uuid` value is the only globally unique, source-native identifier available
 
 UUIDs are long and not human-writable. This is by design and acceptable because:
 
-1. **Discoverability**: Callers first use `GET /api/v1/gpus` to get the full list, including each GPU's `uuid`, `hostname`, and `gpu_id`. The response is human-readable enough to understand which GPU is which.
+1. **Discoverability**: Callers first use `GET /gpus` to get the full list, including each GPU's `uuid`, `hostname`, and `gpu_id`. The response is human-readable enough to understand which GPU is which.
 2. **Machine Consumption**: The API is primarily consumed by dashboards (Grafana), CLIs, or scripts — not by humans typing URLs. These tools copy the `uuid` from the list response and use it programmatically.
 3. **The `gpu_id` is still present**: The listing response includes `gpu_id` so a user can see "GPU 0 on node mtv5-dgx1-hgpu-031" and use the corresponding UUID.
 
@@ -273,7 +275,7 @@ The `Migrate()` function runs at Collector startup and is responsible for all DD
 
 ## 7. JSON Payload Structure
 
-### `GET /api/v1/gpus` Response
+### `GET /gpus` Response
 
 A flat JSON array of GPU summary objects. Each object includes enough context that a caller understands exactly which physical card the `id` refers to, without needing prior knowledge.
 
@@ -288,7 +290,7 @@ A flat JSON array of GPU summary objects. Each object includes enough context th
 ]
 ```
 
-### `GET /api/v1/gpus/{id}/telemetry` Response
+### `GET /gpus/{id}/telemetry` Response
 
 A **wrapped object** (not a raw array) containing the GPU identifier, the count of returned rows, and the data array.
 
@@ -447,7 +449,7 @@ The implementation does this with a two-step query: first a lightweight `SELECT 
 
 ### Why CORS Matters
 
-Browsers enforce the Same-Origin Policy (SOP). If a web-based dashboard hosted at `http://dashboard.company.com` makes a JavaScript `fetch()` call to `http://api-gateway:8083/api/v1/gpus`, the browser will block the response unless the API includes the appropriate `Access-Control-Allow-Origin` response header.
+Browsers enforce the Same-Origin Policy (SOP). If a web-based dashboard hosted at `http://dashboard.company.com` makes a JavaScript `fetch()` call to `http://api-gateway:8083/gpus`, the browser will block the response unless the API includes the appropriate `Access-Control-Allow-Origin` response header.
 
 Without CORS support, the API Gateway is unusable from any browser-based frontend.
 
@@ -577,8 +579,8 @@ db_query_errors_total: 2
 | `requests_total` | Total HTTP requests received (all endpoints) |
 | `requests_success_total` | Requests that returned a `2xx` response |
 | `requests_error_total` | Requests that returned a `4xx` or `5xx` response |
-| `gpu_list_cache_hits_total` | Times `GET /api/v1/gpus` was served from the in-memory cache |
-| `gpu_list_cache_misses_total` | Times `GET /api/v1/gpus` required a live DB query |
+| `gpu_list_cache_hits_total` | Times `GET /gpus` was served from the in-memory cache |
+| `gpu_list_cache_misses_total` | Times `GET /gpus` required a live DB query |
 | `db_query_errors_total` | Total database errors encountered (timeouts + connection failures) |
 
 All counters are `sync/atomic` integers, incremented without locking.

@@ -147,8 +147,13 @@ func TestHandler_HandleReady(t *testing.T) {
 			if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 				t.Fatalf("decoding /ready body: %v", err)
 			}
-			if body["status"] != tt.wantBody {
-				t.Errorf("body[status] = %q, want %q", body["status"], tt.wantBody)
+			// When not ready, we return { "error": "not ready" }
+			got := body["status"]
+			if tt.wantStatus != http.StatusOK {
+				got = body["error"]
+			}
+			if got != tt.wantBody {
+				t.Errorf("body[status/error] = %q, want %q", got, tt.wantBody)
 			}
 		})
 	}

@@ -183,8 +183,15 @@ func TestHandleReady(t *testing.T) {
 			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 				t.Fatalf("unmarshal body: %v", err)
 			}
-			if body["status"] != tt.wantBody {
-				t.Errorf("body.status: got %q, want %q", body["status"], tt.wantBody)
+			// When not ready, we now return ErrorResponse { Error: "not ready" }
+			// instead of ReadyResponse { Status: "not ready" }.
+			got := body["status"]
+			if tt.wantStatus != http.StatusOK {
+				got = body["error"]
+			}
+
+			if got != tt.wantBody {
+				t.Errorf("body status/error: got %q, want %q", got, tt.wantBody)
 			}
 		})
 	}

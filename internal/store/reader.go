@@ -44,7 +44,7 @@ LIMIT $4`
 // cluster and usable directly as the {id} path parameter for telemetry queries.
 type GPUSummary struct {
 	// ID is the hardware UUID (e.g. "GPU-5fd4f087-86f3-7a43-b711-4771313afc50").
-	// It is the value that callers must supply to GET /api/v1/gpus/{id}/telemetry.
+	// It is the value that callers must supply to GET /gpus/{id}/telemetry.
 	ID string `json:"id"`
 	// Hostname is the originating node (e.g. "mtv5-dgx1-hgpu-031").
 	Hostname string `json:"hostname"`

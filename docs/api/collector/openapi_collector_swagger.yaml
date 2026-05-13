@@ -1,0 +1,90 @@
+basePath: /
+definitions:
+  metrics.Snapshot:
+    properties:
+      db_writes_error_total:
+        type: integer
+      db_writes_success_total:
+        type: integer
+      last_db_write_timestamp_seconds:
+        type: number
+      messages_consumed_total:
+        type: integer
+      uptime_seconds:
+        type: integer
+      validation_errors_total:
+        type: integer
+    type: object
+  server.ErrorResponse:
+    properties:
+      error:
+        example: error message
+        type: string
+    type: object
+  server.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  server.ReadyResponse:
+    properties:
+      status:
+        example: ready
+        type: string
+    type: object
+host: localhost:8082
+info:
+  contact: {}
+  description: Internal health and observability API for the Telemetry Collector service.
+  title: GPU Telemetry Pipeline — Collector API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Returns 200 while the collector process is alive.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.HealthResponse'
+      summary: Liveness probe
+      tags:
+      - operations
+  /metrics:
+    get:
+      description: 'Returns a JSON snapshot of collector counters: messages consumed,
+        DB writes (success/error), validation errors, last write timestamp, and uptime.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/metrics.Snapshot'
+      summary: Collector metrics
+      tags:
+      - operations
+  /ready:
+    get:
+      description: Returns 200 when the DB is connected, migration has run, and the
+        consumption loop is active. Returns 503 otherwise.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.ReadyResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Readiness probe
+      tags:
+      - operations
+schemes:
+- http
+swagger: "2.0"

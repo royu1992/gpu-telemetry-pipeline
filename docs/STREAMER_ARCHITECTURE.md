@@ -52,6 +52,7 @@ The Streamer is a **producer** service in the GPU Telemetry Pipeline. Its sole j
 │  ┌──────────────────────────────────────────┐    │
 │  │  Gin Server (:8081)                      │    │
 │  │  GET /health  GET /ready  GET /metrics   │    │
+│  │  GET /docs/index.html                 │    │
 │  └──────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────┘
 ```
@@ -478,6 +479,7 @@ The Gin server on port `8081` exposes the following Kubernetes probe endpoints:
 | `GET /health` | Liveness | Returns `200 OK` if the process is alive |
 | `GET /ready` | Readiness | Returns `200 OK` if the CSV file has been opened successfully and the telemetry loop is running |
 | `GET /metrics` | Monitoring | Returns Prometheus-format metrics |
+| `GET /docs/index.html` | Documentation | Serves the interactive Swagger UI for the Streamer's internal OpenAPI spec |
 
 ### Readiness vs. Liveness
 

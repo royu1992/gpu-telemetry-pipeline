@@ -1,8 +1,8 @@
-// @title           GPU Telemetry Pipeline API
+// @title           GPU Telemetry Pipeline — API Gateway
 // @version         1.0
 // @description     REST API for querying GPU telemetry data collected from an AI cluster.
 // @host            localhost:9090
-// @BasePath        /api/v1
+// @BasePath        /
 // @schemes         http
 package main
 
@@ -62,7 +62,7 @@ func main() {
 	logger.Info("database connection established")
 
 	// Step 2: Build the GPU-list cache backed by the store.
-	// The cache is cold on startup; the first GET /api/v1/gpus request will
+	// The cache is cold on startup; the first GET /gpus request will
 	// trigger a database query and prime the cache.
 	gpuCache := cache.New(dbStore, cfg.CacheTTLGPUs)
 

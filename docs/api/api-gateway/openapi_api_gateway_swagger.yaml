@@ -1,0 +1,213 @@
+basePath: /
+definitions:
+  metrics.Snapshot:
+    properties:
+      db_query_errors_total:
+        type: integer
+      gpu_list_cache_hits_total:
+        type: integer
+      gpu_list_cache_misses_total:
+        type: integer
+      requests_error_total:
+        type: integer
+      requests_success_total:
+        type: integer
+      requests_total:
+        type: integer
+      uptime_seconds:
+        type: integer
+    type: object
+  server.ErrorResponse:
+    properties:
+      error:
+        example: error message
+        type: string
+    type: object
+  server.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  server.ReadyResponse:
+    properties:
+      status:
+        example: ready
+        type: string
+    type: object
+  server.TelemetryResponse:
+    properties:
+      count:
+        example: 100
+        type: integer
+      data: {}
+      id:
+        example: GPU-5fd4...
+        type: string
+    type: object
+  store.GPUSummary:
+    properties:
+      gpu_id:
+        description: GpuID is the ordinal index on that host (e.g. "0", "1").
+        type: string
+      hostname:
+        description: Hostname is the originating node (e.g. "mtv5-dgx1-hgpu-031").
+        type: string
+      id:
+        description: |-
+          ID is the hardware UUID (e.g. "GPU-5fd4f087-86f3-7a43-b711-4771313afc50").
+          It is the value that callers must supply to GET /gpus/{id}/telemetry.
+        type: string
+      model_name:
+        description: ModelName is the GPU product name (e.g. "NVIDIA H100 80GB HBM3").
+        type: string
+    type: object
+host: localhost:9090
+info:
+  contact: {}
+  description: REST API for querying GPU telemetry data collected from an AI cluster.
+  title: GPU Telemetry Pipeline — API Gateway
+  version: "1.0"
+paths:
+  /gpus:
+    get:
+      description: Returns a list of all GPUs for which telemetry data is available,
+        served from an in-memory cache.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of GPU summaries
+          schema:
+            items:
+              $ref: '#/definitions/store.GPUSummary'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: Gateway timeout
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: List all GPUs
+      tags:
+      - gpus
+  /gpus/{id}/telemetry:
+    get:
+      description: Returns telemetry entries for a specific GPU ordered by timestamp.
+        Supports optional RFC3339 time window filters.
+      parameters:
+      - description: GPU hardware UUID (e.g. GPU-5fd4f087-86f3-7a43-b711-4771313afc50)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 'Start of the time window, RFC3339 format, inclusive. Default:
+          1 hour ago.'
+        in: query
+        name: start_time
+        type: string
+      - description: 'End of the time window, RFC3339 format, inclusive. Default:
+          now.'
+        in: query
+        name: end_time
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Telemetry response with id, count, and data array
+          schema:
+            $ref: '#/definitions/server.TelemetryResponse'
+        "400":
+          description: Bad request – invalid time format or start > end
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: GPU not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: Gateway timeout
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get GPU telemetry
+      tags:
+      - gpus
+  /health:
+    get:
+      description: Returns 200 while the api-gateway process is alive.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.HealthResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Liveness probe
+      tags:
+      - operations
+  /metrics:
+    get:
+      description: 'Returns a JSON snapshot of gateway counters: requests total, success,
+        error, cache hits/misses, and DB query errors.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/metrics.Snapshot'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Gateway metrics
+      tags:
+      - operations
+  /ready:
+    get:
+      description: Returns 200 when the database connection is established. Returns
+        503 during startup or when the DB is unavailable.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.ReadyResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Readiness probe
+      tags:
+      - operations
+schemes:
+- http
+swagger: "2.0"

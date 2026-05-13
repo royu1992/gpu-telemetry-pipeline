@@ -19,11 +19,11 @@ type Metrics struct {
 	// requestsErrorTotal counts requests that returned a 4xx or 5xx status code.
 	requestsErrorTotal atomic.Int64
 
-	// gpuListCacheHitsTotal counts times GET /api/v1/gpus was served from
+	// gpuListCacheHitsTotal counts times GET /gpus was served from
 	// the in-memory cache without querying the database.
 	gpuListCacheHitsTotal atomic.Int64
 
-	// gpuListCacheMissesTotal counts times GET /api/v1/gpus required a
+	// gpuListCacheMissesTotal counts times GET /gpus required a
 	// live database query because the cache was cold or expired.
 	gpuListCacheMissesTotal atomic.Int64
 
@@ -39,13 +39,13 @@ type Metrics struct {
 // Snapshot is a point-in-time copy of all metrics values, ready for plain-text
 // serialisation and HTTP delivery via GET /metrics.
 type Snapshot struct {
-	RequestsTotal           int64 `json:"-"`
-	RequestsSuccessTotal    int64 `json:"-"`
-	RequestsErrorTotal      int64 `json:"-"`
-	GPUListCacheHitsTotal   int64 `json:"-"`
-	GPUListCacheMissesTotal int64 `json:"-"`
-	DBQueryErrorsTotal      int64 `json:"-"`
-	UptimeSeconds           int64 `json:"-"`
+	RequestsTotal           int64 `json:"requests_total"`
+	RequestsSuccessTotal    int64 `json:"requests_success_total"`
+	RequestsErrorTotal      int64 `json:"requests_error_total"`
+	GPUListCacheHitsTotal   int64 `json:"gpu_list_cache_hits_total"`
+	GPUListCacheMissesTotal int64 `json:"gpu_list_cache_misses_total"`
+	DBQueryErrorsTotal      int64 `json:"db_query_errors_total"`
+	UptimeSeconds           int64 `json:"uptime_seconds"`
 }
 
 // New creates an initialised Metrics instance with all counters at zero and
@@ -73,13 +73,13 @@ func (m *Metrics) IncRequestsError() {
 }
 
 // IncCacheHit increments the GPU list cache-hit counter by one.
-// Called when GET /api/v1/gpus is served from the in-memory cache.
+// Called when GET /gpus is served from the in-memory cache.
 func (m *Metrics) IncCacheHit() {
 	m.gpuListCacheHitsTotal.Add(1)
 }
 
 // IncCacheMiss increments the GPU list cache-miss counter by one.
-// Called when GET /api/v1/gpus must query the database.
+// Called when GET /gpus must query the database.
 func (m *Metrics) IncCacheMiss() {
 	m.gpuListCacheMissesTotal.Add(1)
 }

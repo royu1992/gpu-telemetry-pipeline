@@ -1,0 +1,308 @@
+basePath: /
+definitions:
+  message_queue.AckRequest:
+    properties:
+      consumer_id:
+        type: string
+      delivery_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - consumer_id
+    - delivery_ids
+    type: object
+  message_queue.AckResult:
+    properties:
+      acked:
+        type: integer
+      rejected:
+        type: integer
+      rejected_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  message_queue.ConsumeResponse:
+    properties:
+      messages:
+        items:
+          $ref: '#/definitions/message_queue.DeliveryItem'
+        type: array
+    type: object
+  message_queue.DeliveryItem:
+    properties:
+      delivery_id:
+        type: string
+      lease_expires:
+        type: string
+      message:
+        $ref: '#/definitions/model.TelemetryMessage'
+    type: object
+  message_queue.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  message_queue.HealthResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  message_queue.PublishRequest:
+    properties:
+      device:
+        type: string
+      gpu_id:
+        type: string
+      hostname:
+        type: string
+      labels_raw:
+        type: string
+      metric_name:
+        type: string
+      model_name:
+        type: string
+      timestamp:
+        type: string
+      uuid:
+        type: string
+      value:
+        type: string
+    required:
+    - metric_name
+    - timestamp
+    - uuid
+    - value
+    type: object
+  message_queue.PublishResponse:
+    properties:
+      message_id:
+        type: string
+    type: object
+  message_queue.ReadyResponse:
+    properties:
+      capacity:
+        type: integer
+      queue_depth:
+        type: integer
+      reason:
+        type: string
+      status:
+        type: string
+    type: object
+  message_queue.Snapshot:
+    properties:
+      capacity:
+        type: integer
+      in_flight:
+        type: integer
+      queue_depth:
+        type: integer
+      total_acked:
+        type: integer
+      total_dropped:
+        type: integer
+      total_published:
+        type: integer
+      total_redelivered:
+        type: integer
+      uptime_seconds:
+        type: integer
+    type: object
+  model.TelemetryMessage:
+    properties:
+      device:
+        type: string
+      gpu_id:
+        type: string
+      hostname:
+        type: string
+      labels_raw:
+        type: string
+      message_id:
+        description: |-
+          MessageID is assigned by the message-queue service upon receipt.
+          It is stable across redeliveries.
+        type: string
+      metric_name:
+        type: string
+      model_name:
+        type: string
+      timestamp:
+        type: string
+      uuid:
+        description: UUID uniquely identifies a GPU across all hosts.
+        type: string
+      value:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Custom in-memory ring-buffer message queue. Streamers publish telemetry;
+    Collectors consume and ack.
+  title: GPU Telemetry Pipeline — Message Queue API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Returns 200 while the process is alive. Used by Kubernetes as a
+        liveness probe.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/message_queue.HealthResponse'
+      summary: Liveness probe
+      tags:
+      - operations
+  /messages:
+    post:
+      consumes:
+      - application/json
+      description: Enqueues a single GPU telemetry data point. Blocks until a slot
+        is free or the publish timeout elapses.
+      parameters:
+      - description: Telemetry message to enqueue
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/message_queue.PublishRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Message accepted; returns the assigned message_id
+          schema:
+            $ref: '#/definitions/message_queue.PublishResponse'
+        "400":
+          description: Missing or invalid request body
+          schema:
+            $ref: '#/definitions/message_queue.ErrorResponse'
+        "429":
+          description: Queue is full; retry with backoff
+          schema:
+            $ref: '#/definitions/message_queue.ErrorResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/message_queue.ErrorResponse'
+        "503":
+          description: Queue is shutting down
+          schema:
+            $ref: '#/definitions/message_queue.ErrorResponse'
+      summary: Publish a telemetry message
+      tags:
+      - messages
+  /messages/ack:
+    post:
+      consumes:
+      - application/json
+      description: Marks delivered messages as processed. Returns 207 Multi-Status
+        if any delivery_id was rejected (expired lease, wrong consumer, or unknown
+        ID).
+      parameters:
+      - description: Consumer ID and list of delivery IDs to acknowledge
+        in: body
+        name: ack
+        required: true
+        schema:
+          $ref: '#/definitions/message_queue.AckRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All messages acknowledged
+          schema:
+            $ref: '#/definitions/message_queue.AckResult'
+        "207":
+          description: Partial success; check rejected_ids
+          schema:
+            $ref: '#/definitions/message_queue.AckResult'
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/message_queue.ErrorResponse'
+      summary: Acknowledge messages
+      tags:
+      - messages
+  /messages/consume:
+    get:
+      description: Long-polls for up to `long_poll_timeout` seconds. Returns up to
+        `batch_size` messages leased to `consumer_id`. Returns 204 on timeout with
+        no messages.
+      parameters:
+      - description: Unique identifier for this consumer instance (typically pod hostname)
+        in: query
+        name: consumer_id
+        required: true
+        type: string
+      - description: 'Maximum number of messages to return (default: server-configured
+          batch size)'
+        in: query
+        name: batch_size
+        type: integer
+      - description: 'Maximum wait duration, e.g. 30s (default: server-configured
+          value)'
+        in: query
+        name: long_poll_timeout
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: One or more messages leased to the caller
+          schema:
+            $ref: '#/definitions/message_queue.ConsumeResponse'
+        "204":
+          description: Long-poll timed out; no messages available — poll again immediately
+        "400":
+          description: consumer_id missing
+          schema:
+            $ref: '#/definitions/message_queue.ErrorResponse'
+        "503":
+          description: Queue is shutting down
+          schema:
+            $ref: '#/definitions/message_queue.ErrorResponse'
+      summary: Consume messages (long poll)
+      tags:
+      - messages
+  /metrics:
+    get:
+      description: Returns a JSON snapshot of queue counters (published, acked, redelivered,
+        dropped) and live state (depth, capacity, in-flight).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/message_queue.Snapshot'
+      summary: Queue metrics
+      tags:
+      - operations
+  /ready:
+    get:
+      description: Returns 200 when the queue is ready to serve traffic, including
+        live queue depth and capacity. Returns 503 during shutdown.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/message_queue.ReadyResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/message_queue.ErrorResponse'
+      summary: Readiness probe
+      tags:
+      - operations
+schemes:
+- http
+swagger: "2.0"

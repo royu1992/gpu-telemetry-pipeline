@@ -8,7 +8,7 @@
 #   make coverage         – run tests and open an HTML coverage report
 #   make compose-up       – start the full stack locally with docker-compose
 #   make k8s-up           – create a kind cluster and install all Helm charts
-#   make generate-openapi – regenerate api/openapi.yaml from swag annotations
+#   make generate-openapi – regenerate OpenAPI specs into docs/api/ from swag annotations
 #
 # All docker targets default to building for the local registry unless
 # REGISTRY is overridden:
@@ -22,6 +22,34 @@ CLUSTER_NAME ?= gpu-telemetry
 MODULE       := github.com/royu1992/gpu-telemetry-pipeline
 
 BIN := bin
+
+# ── OS-portable helpers ─────────────────────────────────────────────────────
+# On Windows, GNU Make invokes cmd.exe; on Unix/macOS it uses /bin/sh.
+# All macros below abstract away shell differences so every target works on
+# both platforms without modification.
+ifeq ($(OS),Windows_NT)
+    # File / directory operations
+    MKDIR        = powershell -Command "New-Item -ItemType Directory -Force -Path $(1) | Out-Null"
+    RMBIN        = powershell -Command "Remove-Item -Recurse -Force $(BIN),coverage.out,coverage.html -ErrorAction SilentlyContinue; exit 0"
+    RMRF_DOCS    = powershell -Command "Remove-Item -Recurse -Force docs/api -ErrorAction SilentlyContinue; exit 0"
+    # Tool installation
+    INSTALL_SWAG = powershell -Command "if (-not (Get-Command swag -ErrorAction SilentlyContinue)) { go install github.com/swaggo/swag/cmd/swag@v1.16.4 }"
+    INSTALL_LINT = powershell -Command "if (-not (Get-Command golangci-lint -ErrorAction SilentlyContinue)) { go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest }"
+    # Helm chart loop — PowerShell equivalent of 'for chart in charts/*/'
+    HELM_LINT_ALL = powershell -Command "Get-ChildItem -Directory charts | ForEach-Object { Write-Host ('==> Linting ' + $$_.FullName); helm lint $$_.FullName; if ($$LASTEXITCODE -ne 0) { exit 1 } }"
+else
+    # File / directory operations
+    MKDIR        = mkdir -p $(1)
+    RMBIN        = rm -rf $(BIN) coverage.out coverage.html
+    RMRF_DOCS    = rm -rf docs/api
+    # Tool installation
+    INSTALL_SWAG = command -v swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@v1.16.4
+    INSTALL_LINT = command -v golangci-lint > /dev/null 2>&1 || \
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+        | sh -s -- -b $$(go env GOPATH)/bin
+    # Helm chart loop
+    HELM_LINT_ALL = for chart in charts/*/; do echo "==> Linting $$chart"; helm lint "$$chart" || exit 1; done
+endif
 
 # ── Phony target declarations ─────────────────────────────────────────────────
 .PHONY: help \
@@ -54,14 +82,14 @@ help: ## Show this help message
 # ==============================================================================
 
 build: ## Build all service binaries (linux/amd64) into ./bin
-	@mkdir -p $(BIN)
+	$(call MKDIR,$(BIN))
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o $(BIN)/api-gateway   ./cmd/api-gateway
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o $(BIN)/collector     ./cmd/collector
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o $(BIN)/message-queue ./cmd/message_queue
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o $(BIN)/streamer      ./cmd/streamer
 
 build-local: ## Build binaries for the host OS (skips cross-compilation)
-	@mkdir -p $(BIN)
+	$(call MKDIR,$(BIN))
 	go build -o $(BIN)/api-gateway   ./cmd/api-gateway
 	go build -o $(BIN)/collector     ./cmd/collector
 	go build -o $(BIN)/message-queue ./cmd/message_queue
@@ -91,56 +119,61 @@ coverage: ## Run tests and produce coverage.out + coverage.html
 # comments in each service's source and emits a per-service OpenAPI 3 spec.
 # The tool is installed on demand so contributors do not need it pre-installed.
 #
-# Output files:
-#   api/openapi.yaml              – API Gateway (public REST API)
-#   api/openapi-message-queue.yaml – Message Queue (internal queue protocol)
-#   api/openapi-collector.yaml    – Collector (health / metrics)
-#   api/openapi-streamer.yaml     – Streamer  (health / metrics)
+# Output files (YAML + generated Go package, one canonical location each):
+#   docs/api/api-gateway/   – API Gateway spec + Go package
+#   docs/api/message-queue/ – Message Queue spec + Go package
+#   docs/api/collector/     – Collector spec + Go package
+#   docs/api/streamer/      – Streamer spec + Go package
 # ==============================================================================
 
 generate-openapi: ## Regenerate OpenAPI specs for all four services
-	@which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest
+	$(INSTALL_SWAG)
+	$(RMRF_DOCS)
 	swag init \
-		--generalInfo cmd/api-gateway/main.go \
-		--dir ./ \
-		--output api \
-		--outputTypes yaml \
-		--instanceName openapi
+		--generalInfo main.go \
+		--dir cmd/api-gateway,internal/api-gateway/server,internal/api-gateway/cache,internal/api-gateway/metrics,internal/store \
+		--output docs/api/api-gateway \
+		--outputTypes go,yaml \
+		--instanceName openapi_api_gateway \
+		--parseInternal
 	swag init \
-		--generalInfo cmd/message_queue/main.go \
-		--dir ./ \
-		--output api \
-		--outputTypes yaml \
-		--instanceName openapi-message-queue
+		--generalInfo main.go \
+		--dir cmd/message_queue,internal/message_queue/queue,internal/message_queue/model,internal/model \
+		--output docs/api/message-queue \
+		--outputTypes go,yaml \
+		--instanceName openapi_message_queue \
+		--parseInternal
 	swag init \
-		--generalInfo cmd/collector/main.go \
-		--dir ./ \
-		--output api \
-		--outputTypes yaml \
-		--instanceName openapi-collector
+		--generalInfo main.go \
+		--dir cmd/collector,internal/collector/server,internal/collector/metrics \
+		--output docs/api/collector \
+		--outputTypes go,yaml \
+		--instanceName openapi_collector \
+		--parseInternal
 	swag init \
-		--generalInfo cmd/streamer/main.go \
-		--dir ./ \
-		--output api \
-		--outputTypes yaml \
-		--instanceName openapi-streamer
-	@echo "OpenAPI specs written to api/"
+		--generalInfo main.go \
+		--dir cmd/streamer,internal/streamer/server,internal/streamer/metrics \
+		--output docs/api/streamer \
+		--outputTypes go,yaml \
+		--instanceName openapi_streamer \
+		--parseInternal
+	@echo "OpenAPI specs written to docs/api/"
 
 generate-openapi-gateway: ## Regenerate only the API Gateway spec
-	@which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest
-	swag init --generalInfo cmd/api-gateway/main.go --dir ./ --output api --outputTypes yaml --instanceName openapi
+	$(INSTALL_SWAG)
+	swag init --generalInfo main.go --dir cmd/api-gateway,internal/api-gateway/server,internal/api-gateway/cache,internal/api-gateway/metrics,internal/store --output docs/api/api-gateway --outputTypes go,yaml --instanceName openapi_api_gateway --parseInternal
 
 generate-openapi-message-queue: ## Regenerate only the Message Queue spec
-	@which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest
-	swag init --generalInfo cmd/message_queue/main.go --dir ./ --output api --outputTypes yaml --instanceName openapi-message-queue
+	$(INSTALL_SWAG)
+	swag init --generalInfo main.go --dir cmd/message_queue,internal/message_queue/queue,internal/message_queue/model,internal/model --output docs/api/message-queue --outputTypes go,yaml --instanceName openapi_message_queue --parseInternal
 
 generate-openapi-collector: ## Regenerate only the Collector spec
-	@which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest
-	swag init --generalInfo cmd/collector/main.go --dir ./ --output api --outputTypes yaml --instanceName openapi-collector
+	$(INSTALL_SWAG)
+	swag init --generalInfo main.go --dir cmd/collector,internal/collector/server --output docs/api/collector --outputTypes go,yaml --instanceName openapi_collector --parseInternal
 
 generate-openapi-streamer: ## Regenerate only the Streamer spec
-	@which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest
-	swag init --generalInfo cmd/streamer/main.go --dir ./ --output api --outputTypes yaml --instanceName openapi-streamer
+	$(INSTALL_SWAG)
+	swag init --generalInfo main.go --dir cmd/streamer,internal/streamer/server --output docs/api/streamer --outputTypes go,yaml --instanceName openapi_streamer --parseInternal
 
 # ==============================================================================
 # Docker
@@ -218,10 +251,7 @@ k8s-create-csv-configmap: ## Create the telemetry-csv ConfigMap from docs/
 # ==============================================================================
 
 helm-lint: ## Validate all Helm chart syntax
-	@for chart in charts/*/; do \
-		echo "==> Linting $$chart"; \
-		helm lint "$$chart" || exit 1; \
-	done
+	$(HELM_LINT_ALL)
 
 helm-install: k8s-create-csv-configmap ## Install all charts into the cluster (waits for each)
 	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
@@ -232,7 +262,7 @@ helm-install: k8s-create-csv-configmap ## Install all charts into the cluster (w
 	helm upgrade --install api-gateway   charts/api-gateway   -n $(NAMESPACE) --wait
 	@echo ""
 	@echo "All components are running. API Gateway is available at http://localhost:9090"
-	@echo "Run: curl http://localhost:9090/api/v1/gpus"
+	@echo "Run: curl http://localhost:9090/gpus"
 
 helm-uninstall: ## Uninstall all Helm releases from the cluster
 	helm uninstall api-gateway   -n $(NAMESPACE) || true
@@ -267,9 +297,7 @@ vet: ## Run go vet across the module
 	go vet ./...
 
 lint: ## Run golangci-lint (installs if absent)
-	@which golangci-lint > /dev/null 2>&1 || \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-		| sh -s -- -b $$(go env GOPATH)/bin
+	$(INSTALL_LINT)
 	golangci-lint run ./...
 
 # ==============================================================================
@@ -277,4 +305,4 @@ lint: ## Run golangci-lint (installs if absent)
 # ==============================================================================
 
 clean: ## Remove compiled binaries and coverage files
-	rm -rf $(BIN) coverage.out coverage.html
+	$(RMBIN)

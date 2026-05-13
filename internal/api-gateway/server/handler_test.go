@@ -183,7 +183,7 @@ func TestHandleMetrics_OK(t *testing.T) {
 	}
 }
 
-// ─── GET /api/v1/gpus ────────────────────────────────────────────────────────
+// ─── GET /gpus ────────────────────────────────────────────────────────
 
 // TestHandleListGPUs_Success verifies that a successful cache/DB call returns
 // HTTP 200 with the GPU list as a JSON array.
@@ -195,10 +195,10 @@ func TestHandleListGPUs_Success(t *testing.T) {
 	lister := &mockListerForHandler{gpus: gpuList}
 	_, engine := newTestHandler(t, reader, lister)
 
-	w := doRequest(engine, "/api/v1/gpus")
+	w := doRequest(engine, "/gpus")
 
 	if w.Code != http.StatusOK {
-		t.Errorf("/api/v1/gpus: got %d, want 200", w.Code)
+		t.Errorf("/gpus: got %d, want 200", w.Code)
 	}
 	var result []store.GPUSummary
 	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
@@ -215,10 +215,10 @@ func TestHandleListGPUs_DBError(t *testing.T) {
 	lister := &mockListerForHandler{err: errors.New("db down")}
 	_, engine := newTestHandler(t, reader, lister)
 
-	w := doRequest(engine, "/api/v1/gpus")
+	w := doRequest(engine, "/gpus")
 
 	if w.Code != http.StatusInternalServerError {
-		t.Errorf("/api/v1/gpus (error): got %d, want 500", w.Code)
+		t.Errorf("/gpus (error): got %d, want 500", w.Code)
 	}
 }
 
@@ -229,10 +229,10 @@ func TestHandleListGPUs_DBTimeout(t *testing.T) {
 	lister := &mockListerForHandler{err: context.DeadlineExceeded}
 	_, engine := newTestHandler(t, reader, lister)
 
-	w := doRequest(engine, "/api/v1/gpus")
+	w := doRequest(engine, "/gpus")
 
 	if w.Code != http.StatusGatewayTimeout {
-		t.Errorf("/api/v1/gpus (timeout): got %d, want 504", w.Code)
+		t.Errorf("/gpus (timeout): got %d, want 504", w.Code)
 	}
 }
 
@@ -248,7 +248,7 @@ func TestHandleListGPUs_CacheMissIncrementsCacheMiss(t *testing.T) {
 	h.RegisterRoutes(engine)
 
 	// Cold cache → miss.
-	doRequest(engine, "/api/v1/gpus")
+	doRequest(engine, "/gpus")
 	snap := m.Snapshot()
 	if snap.GPUListCacheMissesTotal != 1 {
 		t.Errorf("cache miss counter: got %d, want 1", snap.GPUListCacheMissesTotal)
@@ -267,9 +267,9 @@ func TestHandleListGPUs_CacheHitIncrementsHit(t *testing.T) {
 	h.RegisterRoutes(engine)
 
 	// First call: cold cache miss.
-	doRequest(engine, "/api/v1/gpus")
+	doRequest(engine, "/gpus")
 	// Second call: warm cache hit.
-	doRequest(engine, "/api/v1/gpus")
+	doRequest(engine, "/gpus")
 
 	snap := m.Snapshot()
 	if snap.GPUListCacheHitsTotal != 1 {
@@ -277,7 +277,7 @@ func TestHandleListGPUs_CacheHitIncrementsHit(t *testing.T) {
 	}
 }
 
-// ─── GET /api/v1/gpus/:id/telemetry ──────────────────────────────────────────
+// ─── GET /gpus/:id/telemetry ──────────────────────────────────────────
 
 // telemetryTestCase is a table-driven row for handleGetTelemetry tests.
 type telemetryTestCase struct {
@@ -299,7 +299,7 @@ func TestHandleGetTelemetry_EmptyID(t *testing.T) {
 	// Build a Gin context with an empty id param by calling the handler directly.
 	w := httptest.NewRecorder()
 	gc, _ := gin.CreateTestContext(w)
-	gc.Request = httptest.NewRequest(http.MethodGet, "/api/v1/gpus//telemetry", nil)
+	gc.Request = httptest.NewRequest(http.MethodGet, "/gpus//telemetry", nil)
 	// Do not set the "id" param so c.Param("id") returns "".
 	h.handleGetTelemetry(gc)
 
@@ -319,7 +319,7 @@ func TestHandleGetTelemetry_Table(t *testing.T) {
 	cases := []telemetryTestCase{
 		{
 			name: "success_default_window",
-			path: "/api/v1/gpus/GPU-abc/telemetry",
+			path: "/gpus/GPU-abc/telemetry",
 			reader: &mockReader{
 				exists:  true,
 				entries: sampleEntries,
@@ -328,7 +328,7 @@ func TestHandleGetTelemetry_Table(t *testing.T) {
 		},
 		{
 			name: "success_explicit_window",
-			path: "/api/v1/gpus/GPU-abc/telemetry?start_time=2025-01-01T00:00:00Z&end_time=2025-01-01T01:00:00Z",
+			path: "/gpus/GPU-abc/telemetry?start_time=2025-01-01T00:00:00Z&end_time=2025-01-01T01:00:00Z",
 			reader: &mockReader{
 				exists:  true,
 				entries: sampleEntries,
@@ -337,7 +337,7 @@ func TestHandleGetTelemetry_Table(t *testing.T) {
 		},
 		{
 			name: "success_empty_data_within_window",
-			path: "/api/v1/gpus/GPU-abc/telemetry",
+			path: "/gpus/GPU-abc/telemetry",
 			reader: &mockReader{
 				exists:  true,
 				entries: []store.TelemetryEntry{},
@@ -346,13 +346,13 @@ func TestHandleGetTelemetry_Table(t *testing.T) {
 		},
 		{
 			name:     "gpu_not_found",
-			path:     "/api/v1/gpus/GPU-unknown/telemetry",
+			path:     "/gpus/GPU-unknown/telemetry",
 			reader:   &mockReader{exists: false},
 			wantCode: http.StatusNotFound,
 		},
 		{
 			name: "exists_check_db_error_returns_500",
-			path: "/api/v1/gpus/GPU-abc/telemetry",
+			path: "/gpus/GPU-abc/telemetry",
 			reader: &mockReader{
 				existsErr: errors.New("connection refused"),
 			},
@@ -360,7 +360,7 @@ func TestHandleGetTelemetry_Table(t *testing.T) {
 		},
 		{
 			name: "exists_check_timeout_returns_504",
-			path: "/api/v1/gpus/GPU-abc/telemetry",
+			path: "/gpus/GPU-abc/telemetry",
 			reader: &mockReader{
 				existsErr: context.DeadlineExceeded,
 			},
@@ -368,7 +368,7 @@ func TestHandleGetTelemetry_Table(t *testing.T) {
 		},
 		{
 			name: "telemetry_query_error_returns_500",
-			path: "/api/v1/gpus/GPU-abc/telemetry",
+			path: "/gpus/GPU-abc/telemetry",
 			reader: &mockReader{
 				exists:  true,
 				teleErr: errors.New("query failed"),
@@ -377,7 +377,7 @@ func TestHandleGetTelemetry_Table(t *testing.T) {
 		},
 		{
 			name: "telemetry_query_timeout_returns_504",
-			path: "/api/v1/gpus/GPU-abc/telemetry",
+			path: "/gpus/GPU-abc/telemetry",
 			reader: &mockReader{
 				exists:  true,
 				teleErr: context.DeadlineExceeded,
@@ -386,19 +386,19 @@ func TestHandleGetTelemetry_Table(t *testing.T) {
 		},
 		{
 			name:     "invalid_start_time_returns_400",
-			path:     "/api/v1/gpus/GPU-abc/telemetry?start_time=not-a-date",
+			path:     "/gpus/GPU-abc/telemetry?start_time=not-a-date",
 			reader:   &mockReader{exists: true},
 			wantCode: http.StatusBadRequest,
 		},
 		{
 			name:     "invalid_end_time_returns_400",
-			path:     "/api/v1/gpus/GPU-abc/telemetry?end_time=not-a-date",
+			path:     "/gpus/GPU-abc/telemetry?end_time=not-a-date",
 			reader:   &mockReader{exists: true},
 			wantCode: http.StatusBadRequest,
 		},
 		{
 			name:     "start_after_end_returns_400",
-			path:     "/api/v1/gpus/GPU-abc/telemetry?start_time=2025-01-01T02:00:00Z&end_time=2025-01-01T01:00:00Z",
+			path:     "/gpus/GPU-abc/telemetry?start_time=2025-01-01T02:00:00Z&end_time=2025-01-01T01:00:00Z",
 			reader:   &mockReader{exists: true},
 			wantCode: http.StatusBadRequest,
 		},
@@ -435,7 +435,7 @@ func TestHandleGetTelemetry_ResponseShape(t *testing.T) {
 	lister := &mockListerForHandler{gpus: []store.GPUSummary{}}
 	_, engine := newTestHandler(t, reader, lister)
 
-	w := doRequest(engine, "/api/v1/gpus/GPU-abc/telemetry")
+	w := doRequest(engine, "/gpus/GPU-abc/telemetry")
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status: got %d, want 200", w.Code)

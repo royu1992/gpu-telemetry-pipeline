@@ -8,9 +8,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/royu1992/gpu-telemetry-pipeline/docs/api/message-queue"
 	queuecfg "github.com/royu1992/gpu-telemetry-pipeline/internal/message_queue/config"
 	message_queue "github.com/royu1992/gpu-telemetry-pipeline/internal/message_queue/model"
 	"github.com/royu1992/gpu-telemetry-pipeline/internal/model"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // MessageQueueHandler holds the dependencies required to serve the message-queue HTTP API.
@@ -60,6 +63,10 @@ func (h *MessageQueueHandler) RegisterRoutes(r *gin.Engine) {
 	r.GET("/health", h.handleHealth)
 	r.GET("/ready", h.handleReady)
 	r.GET("/metrics", h.handleMetrics)
+
+	// Swagger UI documentation endpoint for the Message Queue internal API.
+	r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
+		ginSwagger.InstanceName("openapi_message_queue")))
 }
 
 // handlePublish handles POST /messages.
@@ -293,15 +300,14 @@ func (h *MessageQueueHandler) handleHealth(c *gin.Context) {
 // @Tags         operations
 // @Produce      json
 // @Success      200  {object}  message_queue.ReadyResponse
-// @Failure      503  {object}  message_queue.ReadyResponse
+// @Failure      503  {object}  message_queue.ErrorResponse
 // @Router       /ready [get]
 func (h *MessageQueueHandler) handleReady(c *gin.Context) {
 	// Return 503 if the service is shutting down, causing the Kubernetes
 	// readiness probe to remove this pod from the load balancer rotation.
 	if !h.ready.Load() {
-		c.JSON(http.StatusServiceUnavailable, message_queue.ReadyResponse{
-			Status: "not ready",
-			Reason: "shutting down",
+		c.JSON(http.StatusServiceUnavailable, message_queue.ErrorResponse{
+			Error: "queue is shutting down",
 		})
 
 		return
