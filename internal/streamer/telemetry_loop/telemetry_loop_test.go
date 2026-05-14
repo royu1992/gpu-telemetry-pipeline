@@ -236,11 +236,11 @@ func TestTelemetryLoop_Run_CSVParseError(t *testing.T) {
 	defer srv.Close()
 
 	cfg := config.StreamerConfig{
-		CSVPath:              path,
-		QueueURL:             srv.URL,
-		Interval:             5 * time.Millisecond,
-		RetryAttempts:        1,
-		RequestTimeout:       100 * time.Millisecond,
+		CSVPath:        path,
+		QueueURL:       srv.URL,
+		Interval:       5 * time.Millisecond,
+		RetryAttempts:  1,
+		RequestTimeout: 100 * time.Millisecond,
 		// Step: MaxConsecutiveErrors=1 means the loop exits after the first bad row.
 		MaxConsecutiveErrors: 1,
 	}
@@ -382,10 +382,10 @@ func TestTelemetryLoop_Run_SendFailure(t *testing.T) {
 
 func TestTelemetryLoop_SleepOrStop(t *testing.T) {
 	tests := []struct {
-		name       string
-		interval   time.Duration
+		name        string
+		interval    time.Duration
 		cancelAfter time.Duration
-		wantResult bool
+		wantResult  bool
 	}{
 		{
 			// Step: Context is cancelled before the interval elapses → returns false.

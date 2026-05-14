@@ -98,7 +98,7 @@ timestamp, metric_name, gpu_id, device, uuid, modelName, Hostname,
 container, pod, namespace, value, labels_raw
 ```
 
-The Streamer reads **all columns** and maps them directly to the `TelemetryMessage` schema before sending to the queue. All rows after the header are treated as data rows.
+The Streamer reads the CSV columns and maps them to the `TelemetryMessage` schema before sending to the queue. Note: the CSV `timestamp` column is ignored — the Streamer generates the `timestamp` value at publish time (UTC, RFC3339) so replayed rows are recorded with the ingest wall-clock time. All rows after the header are treated as data rows.
 
 ---
 
@@ -206,11 +206,15 @@ The Message Queue already has backpressure built in: when its ring buffer is ful
 
 ### Request Payload
 
-Each POST sends a JSON body matching the `PublishRequest` schema defined in `internal/message_queue/model/`:
+Each POST sends a JSON body matching the `PublishRequest` schema defined in `internal/message_queue/model/`.
+
+Note: the Streamer now **generates the `timestamp` at publish time** (UTC, RFC3339) rather than using the historical timestamp embedded in the CSV file. This ensures replayed CSV rows are visible to the API Gateway's default recent-time queries.
+
+Example payload (timestamp generated at publish time):
 
 ```json
 {
-  "timestamp":   "2025-07-18T20:42:34Z",
+  "timestamp":   "2026-05-14T06:48:45Z",
   "metric_name": "DCGM_FI_DEV_GPU_UTIL",
   "gpu_id":      "0",
   "device":      "nvidia0",

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 )
 
 // csvColumns lists the exact header names the streamer expects to find in the
@@ -168,7 +169,9 @@ func (r *CSVReader) parseRow(record []string) CSVRow {
 	}
 
 	return CSVRow{
-		Timestamp:  col("timestamp"),
+		// Use the current system time instead of the timestamp from the CSV
+		// so that the telemetry is visible in the API Gateway's 1-hour window.
+		Timestamp:  time.Now().UTC().Format(time.RFC3339),
 		MetricName: col("metric_name"),
 		GpuID:      col("gpu_id"),
 		Device:     col("device"),

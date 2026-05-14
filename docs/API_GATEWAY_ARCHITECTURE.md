@@ -141,7 +141,7 @@ Returns all telemetry entries for a specific GPU, ordered by time ascending.
 **Example Requests:**
 ```
 GET /gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry
-GET /gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry?start_time=2025-07-18T20:00:00Z&end_time=2025-07-18T21:00:00Z
+GET /gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry?start_time=2026-05-14T05:48:45Z&end_time=2026-05-14T06:48:45Z
 ```
 
 **Response**: `200 OK` with a wrapped JSON object (see Section 7).

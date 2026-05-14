@@ -47,15 +47,15 @@ func TestLoad(t *testing.T) {
 			// Step: Verify that valid env vars override every default.
 			name: "all fields overridden by env vars",
 			env: map[string]string{
-				"STREAMER_CSV_PATH":               "/data/metrics.csv",
-				"STREAMER_QUEUE_URL":              "http://queue:9090",
-				"STREAMER_INTERVAL_MS":            "200",
+				"STREAMER_CSV_PATH":                "/data/metrics.csv",
+				"STREAMER_QUEUE_URL":               "http://queue:9090",
+				"STREAMER_INTERVAL_MS":             "200",
 				"STREAMER_REQUEST_TIMEOUT_SECONDS": "5",
 				"STREAMER_SHUTDOWN_GRACE_SECONDS":  "15",
 				"STREAMER_MAX_CONSECUTIVE_ERRORS":  "20",
 				"STREAMER_RETRY_ATTEMPTS":          "5",
 				"STREAMER_RETRY_DELAY_SECONDS":     "3",
-				"STREAMER_PORT":                   "9000",
+				"STREAMER_PORT":                    "9000",
 			},
 			want: StreamerConfig{
 				CSVPath:              "/data/metrics.csv",
@@ -73,7 +73,7 @@ func TestLoad(t *testing.T) {
 			// Step: Verify that non-numeric string values fall back to defaults.
 			name: "non-numeric integer env vars fall back to defaults",
 			env: map[string]string{
-				"STREAMER_INTERVAL_MS":            "not-a-number",
+				"STREAMER_INTERVAL_MS":             "not-a-number",
 				"STREAMER_REQUEST_TIMEOUT_SECONDS": "abc",
 				"STREAMER_MAX_CONSECUTIVE_ERRORS":  "xyz",
 			},
@@ -94,7 +94,7 @@ func TestLoad(t *testing.T) {
 			// envInt rejects n < 0, ensuring durations are never negative.
 			name: "negative integer env vars fall back to defaults",
 			env: map[string]string{
-				"STREAMER_INTERVAL_MS":            "-1",
+				"STREAMER_INTERVAL_MS":             "-1",
 				"STREAMER_REQUEST_TIMEOUT_SECONDS": "-5",
 				"STREAMER_RETRY_ATTEMPTS":          "-3",
 			},
