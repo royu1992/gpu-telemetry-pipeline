@@ -3,17 +3,14 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+# CSV data is mounted from the host (kind cluster node) at /data/dcgm_metrics_20250718_134233.csv
+# This is set up in kind-config.yaml to avoid ConfigMap 1MiB limit.
 config:
   queueAddr:          "http://message-queue:8080"
   csvPath:            "/data/dcgm_metrics_20250718_134233.csv"
   emitInterval:       "1s"
   batchSize:          "10"
   maxRetries:         "3"
-
-# CSV data is mounted from a ConfigMap created by:
-#   make k8s-create-csv-configmap
-# The key inside the ConfigMap must be dcgm_metrics_20250718_134233.csv
-csvConfigMapName: "telemetry-csv"
 
 # Horizontal Pod Autoscaler — scales streamer pods 1–10 based on CPU.
 autoscaling:

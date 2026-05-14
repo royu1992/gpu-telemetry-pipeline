@@ -28,4 +28,12 @@ nodes:
         protocol: TCP
 
   - role: worker
+    extraMounts:
+      - hostPath: docs/dcgm_metrics_20250718_134233.csv
+        containerPath: /data/dcgm_metrics_20250718_134233.csv
+        readOnly: true
   - role: worker
+    extraMounts:
+      - hostPath: docs/dcgm_metrics_20250718_134233.csv
+        containerPath: /data/dcgm_metrics_20250718_134233.csv
+        readOnly: true

@@ -253,7 +253,7 @@ k8s-create-csv-configmap: ## Create the telemetry-csv ConfigMap from docs/
 helm-lint: ## Validate all Helm chart syntax
 	$(HELM_LINT_ALL)
 
-helm-install: k8s-create-csv-configmap ## Install all charts into the cluster (waits for each)
+helm-install: ## Install all charts into the cluster (waits for each)
 	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 	helm upgrade --install postgres      charts/postgres      -n $(NAMESPACE) --wait
 	helm upgrade --install message-queue charts/message-queue -n $(NAMESPACE) --wait
