@@ -62,9 +62,8 @@ endif
         docker-build-api-gateway docker-build-collector \
         docker-build-message-queue docker-build-streamer \
         compose-up compose-down compose-logs compose-ps \
-        kind-create kind-delete kind-load \
-        k8s-create-csv-configmap \
-        helm-lint helm-install helm-uninstall helm-upgrade \
+		kind-create kind-delete kind-load \
+		helm-lint helm-install helm-uninstall helm-upgrade \
         k8s-up k8s-down \
         fmt vet lint \
         clean
@@ -240,11 +239,8 @@ kind-load: docker-build ## Build and load all images into the kind cluster
 # Kubernetes helpers
 # ==============================================================================
 
-k8s-create-csv-configmap: ## Create the telemetry-csv ConfigMap from docs/
-	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
-	kubectl create configmap telemetry-csv \
-		--from-file=dcgm_metrics_20250718_134233.csv=docs/dcgm_metrics_20250718_134233.csv \
-		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+# `k8s-create-csv-configmap` target removed — CSV is now included inside the
+# `streamer` runtime image, so creating a large ConfigMap is no longer needed.
 
 # ==============================================================================
 # Helm
@@ -256,10 +252,10 @@ helm-lint: ## Validate all Helm chart syntax
 helm-install: ## Install all charts into the cluster (waits for each)
 	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 	helm upgrade --install postgres      charts/postgres      -n $(NAMESPACE) --wait
-	helm upgrade --install message-queue charts/message-queue -n $(NAMESPACE) --wait
-	helm upgrade --install collector     charts/collector     -n $(NAMESPACE) --wait
-	helm upgrade --install streamer      charts/streamer      -n $(NAMESPACE) --wait
-	helm upgrade --install api-gateway   charts/api-gateway   -n $(NAMESPACE) --wait
+	helm upgrade --install message-queue charts/message-queue -n $(NAMESPACE) --wait --set image.repository=$(REGISTRY)/message-queue --set image.tag=$(TAG)
+	helm upgrade --install collector     charts/collector     -n $(NAMESPACE) --wait --set image.repository=$(REGISTRY)/collector --set image.tag=$(TAG)
+	helm upgrade --install streamer      charts/streamer      -n $(NAMESPACE) --wait --set image.repository=$(REGISTRY)/streamer --set image.tag=$(TAG)
+	helm upgrade --install api-gateway   charts/api-gateway   -n $(NAMESPACE) --wait --set image.repository=$(REGISTRY)/api-gateway --set image.tag=$(TAG)
 	@echo ""
 	@echo "All components are running. API Gateway is available at http://localhost:9090"
 	@echo "Run: curl http://localhost:9090/gpus"

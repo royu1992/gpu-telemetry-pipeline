@@ -32,7 +32,7 @@ func TestLoad(t *testing.T) {
 			name: "default values when no env vars set",
 			env:  map[string]string{},
 			want: StreamerConfig{
-				CSVPath:              "docs/dcgm_metrics_20250718_134233.csv",
+				CSVPath:              "/data/dcgm_metrics_20250718_134233.csv",
 				QueueURL:             "http://message-queue:8080",
 				Interval:             100 * time.Millisecond,
 				RequestTimeout:       10 * time.Second,
@@ -78,7 +78,7 @@ func TestLoad(t *testing.T) {
 				"STREAMER_MAX_CONSECUTIVE_ERRORS":  "xyz",
 			},
 			want: StreamerConfig{
-				CSVPath:              "docs/dcgm_metrics_20250718_134233.csv",
+				CSVPath:              "/data/dcgm_metrics_20250718_134233.csv",
 				QueueURL:             "http://message-queue:8080",
 				Interval:             100 * time.Millisecond,
 				RequestTimeout:       10 * time.Second,
@@ -99,7 +99,7 @@ func TestLoad(t *testing.T) {
 				"STREAMER_RETRY_ATTEMPTS":          "-3",
 			},
 			want: StreamerConfig{
-				CSVPath:              "docs/dcgm_metrics_20250718_134233.csv",
+				CSVPath:              "/data/dcgm_metrics_20250718_134233.csv",
 				QueueURL:             "http://message-queue:8080",
 				Interval:             100 * time.Millisecond,
 				RequestTimeout:       10 * time.Second,

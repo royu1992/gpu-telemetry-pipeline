@@ -41,10 +41,7 @@ spec:
               value: "10"
             - name: STREAMER_SHUTDOWN_GRACE_SECONDS
               value: "30"
-          volumeMounts:
-            - name: csv-data
-              mountPath: /data
-              readOnly: true
+          # CSV is baked into the container image at /data/dcgm_metrics_20250718_134233.csv
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           livenessProbe:
@@ -61,8 +58,4 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 3
-      volumes:
-        - name: csv-data
-          hostPath:
-            path: /data/dcgm_metrics_20250718_134233.csv
-            type: File
+      # No volumes required: CSV file is present inside the image.

@@ -217,20 +217,13 @@ kind create cluster --config kind-config.yaml --name gpu-telemetry
 make docker-build
 make kind-load
 
-# 3. Create namespace and CSV ConfigMap
-make k8s-create-csv-configmap
+# 3. Install Helm charts and create namespace (CSV is baked into image)
+make k8s-up
 
-# 4. Install Helm charts in dependency order
-helm upgrade --install postgres      charts/postgres      -n gpu-telemetry --wait
-helm upgrade --install message-queue charts/message-queue -n gpu-telemetry --wait
-helm upgrade --install collector     charts/collector     -n gpu-telemetry --wait
-helm upgrade --install streamer      charts/streamer      -n gpu-telemetry --wait
-helm upgrade --install api-gateway   charts/api-gateway   -n gpu-telemetry --wait
-
-# 5. Verify pods are Running
+# 4. Verify pods are Running
 kubectl get pods -n gpu-telemetry
 
-# 6. Tear down
+# 5. Tear down
 make k8s-down
 ```
 
