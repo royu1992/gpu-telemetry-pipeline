@@ -18,6 +18,11 @@ RUN apk add --no-cache wget ca-certificates tzdata && \
 
 WORKDIR /app
 COPY --from=builder /out/streamer .
+# Include the sample CSV inside the runtime image so Kind deployments do not
+# require hostPath mounts or ConfigMaps. Place it under /data to match
+# the `STREAMER_CSV_PATH` used by the deployment.
+COPY docs/dcgm_metrics_20250718_134233.csv /data/dcgm_metrics_20250718_134233.csv
+RUN mkdir -p /data && chown -R app:app /data
 
 USER app
 EXPOSE 8081

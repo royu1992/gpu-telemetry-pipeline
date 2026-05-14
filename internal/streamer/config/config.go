@@ -57,7 +57,7 @@ type StreamerConfig struct {
 func Load() StreamerConfig {
 	return StreamerConfig{
 		// File system and network coordinates.
-		CSVPath:  envStr("STREAMER_CSV_PATH", "docs/dcgm_metrics_20250718_134233.csv"),
+		CSVPath:  envStr("STREAMER_CSV_PATH", "/data/dcgm_metrics_20250718_134233.csv"),
 		QueueURL: envStr("STREAMER_QUEUE_URL", "http://message-queue:8080"),
 
 		// Timing: interval is given in milliseconds; the rest are in seconds.

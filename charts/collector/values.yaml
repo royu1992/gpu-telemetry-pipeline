@@ -3,6 +3,11 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+service:
+  type: NodePort
+  port: 8082
+  nodePort: 30082
+
 config:
   queueAddr:      "http://message-queue:8080"
   batchSize:      "10"

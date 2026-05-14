@@ -8,9 +8,15 @@ auth:
   username: postgres
   password: postgres
 
+auth:
+  database: telemetry
+  username: postgres
+  password: postgres
+
 service:
-  type: ClusterIP
+  type: NodePort
   port: 5432
+  nodePort: 30043
 
 persistence:
   enabled: true

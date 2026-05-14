@@ -2,9 +2,8 @@
 #
 # Topology: 1 control-plane + 2 workers  →  mirrors a small production cluster.
 #
-# The control-plane node has an extra port mapping on 9090 so the API Gateway
-# NodePort service (30090) is reachable from the host at localhost:9090 without
-# an additional kubectl port-forward.
+# The control-plane node has extra port mappings so all services are reachable
+# from the host at localhost:<port> without kubectl port-forward.
 #
 # Usage:
 #   kind create cluster --config kind-config.yaml --name gpu-telemetry
@@ -20,20 +19,22 @@ nodes:
         nodeRegistration:
           kubeletExtraArgs:
             node-labels: "ingress-ready=true"
-    # Expose API Gateway NodePort to the host so smoke-tests work without
-    # a separate port-forward session.
     extraPortMappings:
-      - containerPort: 30090
+      - containerPort: 30090  # api-gateway NodePort
         hostPort: 9090
+        protocol: TCP
+      - containerPort: 30080  # message-queue NodePort
+        hostPort: 8080
+        protocol: TCP
+      - containerPort: 30082  # collector NodePort
+        hostPort: 8082
+        protocol: TCP
+      - containerPort: 30081  # streamer NodePort
+        hostPort: 8081
+        protocol: TCP
+      - containerPort: 30043  # postgres NodePort
+        hostPort: 5432
         protocol: TCP
 
   - role: worker
-    extraMounts:
-      - hostPath: docs/dcgm_metrics_20250718_134233.csv
-        containerPath: /data/dcgm_metrics_20250718_134233.csv
-        readOnly: true
   - role: worker
-    extraMounts:
-      - hostPath: docs/dcgm_metrics_20250718_134233.csv
-        containerPath: /data/dcgm_metrics_20250718_134233.csv
-        readOnly: true

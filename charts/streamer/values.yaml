@@ -3,8 +3,14 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
-# CSV data is mounted from the host (kind cluster node) at /data/dcgm_metrics_20250718_134233.csv
-# This is set up in kind-config.yaml to avoid ConfigMap 1MiB limit.
+service:
+  type: NodePort
+  port: 8081
+  nodePort: 30081
+
+# The sample CSV is baked into the streamer runtime image at
+# `/data/dcgm_metrics_20250718_134233.csv`. No host mounts or ConfigMaps
+# are required for local Kind development.
 config:
   queueAddr:          "http://message-queue:8080"
   csvPath:            "/data/dcgm_metrics_20250718_134233.csv"
