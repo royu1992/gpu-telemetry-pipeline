@@ -98,14 +98,26 @@ build-local: ## Build binaries for the host OS (skips cross-compilation)
 # Tests & coverage
 # ==============================================================================
 
-test: ## Run the full unit-test suite with race detection
-	go test -v -race ./...
+test: ## Run the full unit-test suite (race detection omitted on Windows without CGO)
+ifeq ($(OS),Windows_NT)
+	go test -v ./...
+else
+	CGO_ENABLED=1 go test -v -race ./...
+endif
 
-test-short: ## Run tests, skipping integration / slow tests
-	go test -short -race ./...
+test-short: ## Run tests, skipping integration (race detection omitted on Windows without CGO)
+ifeq ($(OS),Windows_NT)
+	go test -short -v ./...
+else
+	CGO_ENABLED=1 go test -short -race ./...
+endif
 
 coverage: ## Run tests and produce coverage.out + coverage.html
+ifeq ($(OS),Windows_NT)
 	go test -coverprofile=coverage.out -covermode=atomic ./...
+else
+	CGO_ENABLED=1 go test -coverprofile=coverage.out -covermode=atomic ./...
+endif
 	go tool cover -func=coverage.out
 	go tool cover -html=coverage.out -o coverage.html
 	@echo ""

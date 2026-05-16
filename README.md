@@ -84,46 +84,70 @@ Each CSV row produces one `TelemetryMessage` (JSON over HTTP) and one row in `gp
 
 ## Repository layout
 
-```
+```text
 .
-├── build/                  # Dockerfiles (one per service)
+├── build/                  # Multi-stage Dockerfiles
 │   ├── api-gateway/
 │   ├── collector/
 │   ├── message-queue/
 │   ├── postgres/
 │   └── streamer/
-├── charts/                 # Helm charts (one per component)
+├── charts/                 # Helm charts
 │   ├── api-gateway/
 │   ├── collector/
 │   ├── message-queue/
 │   ├── postgres/
 │   └── streamer/
-├── cmd/                    # main packages
+├── cmd/                    # Entry points (main packages)
 │   ├── api-gateway/
 │   ├── collector/
 │   ├── message_queue/
 │   └── streamer/
-├── docs/                   # Architecture docs, DCGM CSV data file, and OpenAPI specs
-│   ├── api/                # Generated OpenAPI specs + Go registration packages
-│   │   ├── api-gateway/    #   spec + swaggo package for the API Gateway
-│   │   ├── collector/      #   spec + swaggo package for the Collector
-│   │   ├── message-queue/  #   spec + swaggo package for the Message Queue
-│   │   └── streamer/       #   spec + swaggo package for the Streamer
+├── docs/                   # Documentation and static assets
+│   ├── api/                # OpenAPI specs and Swagger registration
+│   │   ├── api-gateway/
+│   │   ├── collector/
+│   │   ├── message-queue/
+│   │   └── streamer/
 │   ├── API_GATEWAY_ARCHITECTURE.md
 │   ├── COLLECTOR_ARCHITECTURE.md
+│   ├── dcgm_metrics_20250718_134233.csv
+│   ├── GPU Telemetry Pipeline Message Queue.pdf
+│   ├── GPU_TELEMETRY_PIPELINE_ARCHITECTURE.md
 │   ├── MESSAGE_QUEUE_ARCHITECTURE.md
 │   └── STREAMER_ARCHITECTURE.md
-├── internal/               # Shared and service-specific packages
-│   ├── api-gateway/
-│   ├── collector/
-│   ├── message_queue/
-│   ├── model/              # Shared TelemetryMessage type
-│   ├── store/              # PostgreSQL read/write layer
-│   └── streamer/
-├── docker-compose.yaml     # Full local stack
-├── kind-config.yaml        # kind cluster topology
-└── Makefile                # All build, test, and deploy targets
+├── internal/               # Private application code
+│   ├── api-gateway/        # API Gateway implementation (cache, config, metrics, server)
+│   ├── collector/          # Collector implementation (consumer, metrics, config)
+│   ├── message_queue/      # Message Queue logic (ring buffer, lease reaper, server)
+│   ├── model/              # Shared telemetry data types
+│   ├── store/              # PostgreSQL persistence layer (reader/writer)
+│   └── streamer/           # Streamer logic (CSV reader, publisher, loop)
+├── docker-compose.yaml     # Local development stack
+├── go.mod                  # Go module definition
+├── go.sum                  # Dependency checksums
+├── kind-config.yaml        # Local K8s cluster configuration
+├── Makefile                # Build and automation targets
+└── README.md
 ```
+
+## Documentation
+
+The `docs/` directory contains detailed per-service architecture documents, OpenAPI specs, sample data, and project specifications. Quick links:
+
+- [Combined architecture overview](docs/GPU_TELEMETRY_PIPELINE_ARCHITECTURE.md)
+- Architecture docs:
+  - [API Gateway architecture](docs/API_GATEWAY_ARCHITECTURE.md)
+  - [Collector architecture](docs/COLLECTOR_ARCHITECTURE.md)
+  - [Message Queue architecture](docs/MESSAGE_QUEUE_ARCHITECTURE.md)
+  - [Streamer architecture](docs/STREAMER_ARCHITECTURE.md)
+- OpenAPI specs:
+  - [API Gateway spec](docs/api/api-gateway/openapi_api_gateway_swagger.yaml)
+  - [Collector spec](docs/api/collector/openapi_collector_swagger.yaml)
+  - [Message Queue spec](docs/api/message-queue/openapi_message_queue_swagger.yaml)
+  - [Streamer spec](docs/api/streamer/openapi_streamer_swagger.yaml)
+- Sample CSV: [docs/dcgm_metrics_20250718_134233.csv](docs/dcgm_metrics_20250718_134233.csv)
+- Project specifications and requirements: [docs/GPU Telemetry Pipeline Message Queue.pdf](docs/GPU%20Telemetry%20Pipeline%20Message%20Queue.pdf)
 
 ---
 
@@ -131,11 +155,15 @@ Each CSV row produces one `TelemetryMessage` (JSON over HTTP) and one row in `gp
 
 | Tool | Minimum version | Purpose |
 |---|---|---|
+| Git | any | Source control (clone the repository) |
+| Make (GNU Make) | any | Build orchestration and Makefile targets |
 | Go | 1.25 | Build and test |
 | Docker + Docker Compose v2 | 24+ | Container builds and local stack |
 | kind | 0.23+ | Local Kubernetes cluster |
 | kubectl | 1.30+ | Cluster interaction |
 | Helm | 3.14+ | Chart packaging and release management |
+| curl | any | Command-line HTTP client used in examples |
+| psql *(optional)* | any | Optional Postgres client for inspecting the DB |
 | swag *(optional)* | latest | OpenAPI spec generation (`make generate-openapi` auto-installs it) |
 
 ---
@@ -420,70 +448,201 @@ make generate-openapi-streamer
 
 ## AI assistance documentation
 
-This project was developed with extensive use of GitHub Copilot (Claude Sonnet 4.5 / 4.6). The following table summarises which aspects were AI-assisted and where manual intervention was required.
+This project was built end-to-end with [GitHub Copilot](https://github.com/features/copilot) (Claude Sonnet 4.5 / 4.6) as a pair-programming assistant. Rather than using AI to auto-complete snippets, the workflow was conversational: each service was designed, debated, implemented, tested, and documented in a structured dialogue before moving to the next. The sections below document that workflow phase by phase, including the refined prompts that drove each stage and notes on where human judgement was still essential.
 
-### Bootstrapping
+---
 
-| Aspect | AI-assisted? | Notes |
+### Phase 1 — Project understanding & repository structure
+
+The first session established shared understanding of the requirements and produced the top-level project layout.
+
+**Goal:** Ingest the project brief (PDF) and sample DCGM CSV, confirm understanding of the requirements, assess complexity, and agree on a Go module structure before writing a single line of code.
+
+**Prompts:**
+
+1. *"We will be working on a new Go project. The project description and requirements document PDF and testing sample data CSV files are attached. Please read them thoroughly and explain the requirements of this project to me."*
+
+2. *"Which component do you think will take the most time and effort to implement, and why?"*
+
+3. *"Although we have not yet discussed the other components in detail, you are already aware of the full project requirements. Propose an appropriate directory structure for the GPU Telemetry Pipeline project."*
+
+**Outcome:** Agreement on the `cmd/` / `internal/` / `build/` / `charts/` / `docs/` layout that the repository uses today, with one top-level package per service and a shared `internal/model` and `internal/store`.
+
+---
+
+### Phase 2 — Message Queue: architecture design
+
+The Message Queue was identified as the highest-risk component and was therefore designed first, one problem at a time.
+
+**Goal:** Arrive at a complete, production-quality design for the in-memory queue before writing any code. Each sub-topic was discussed and closed before moving to the next.
+
+**Architecture discussion prompts (in order):**
+
+1. *"Let's discuss each architectural problem we need to solve in the Message Queue service. Take one problem at a time, discuss it, finalise a decision, and then move on to the next."*
+
+2. *"What is a ring buffer? Why would we use one here instead of a plain Go channel or a standard queue implementation? What are the advantages and trade-offs?"*
+
+3. *"What does it mean to dead-letter a message? If we implement a dead-letter queue, would it not add unnecessary complexity for this project?"*
+
+4. *"Let's discuss Consumer Group coordination — how should multiple Collector replicas share work without duplicating consumption?"*
+
+5. *"Let's discuss backpressure — what happens when the ring buffer is full and a Streamer tries to publish?"*
+
+6. *"Let's discuss service discovery — how do the Streamers and Collectors find the Message Queue without hard-coding its address?"*
+
+7. *"We haven't discussed the Message Queue's communication protocol on either side. What should we use for Streamer → Queue and Queue → Collector, and why?"*
+
+8. *"Is there anything else in the Message Queue architecture that we have missed and that warrants discussion before we move to implementation?"*
+
+9. *"Now let's discuss each API endpoint for the Message Queue in detail — request/response shape, error codes, and edge cases."*
+
+10. *"For the HTTP server inside the Message Queue, why use the standard `net/http` package instead of the Gin framework?"*
+
+**Architecture document prompt:**
+
+*"Now that we have finalised the architecture for the Message Queue, create a comprehensive and detailed document for the Message Queue service (named `message-queue` in Kubernetes). It should cover everything we discussed — design decisions, data structures, concurrency model, API contract, and operational considerations — explained clearly enough for anyone joining the project to understand it from scratch."*
+
+---
+
+### Phase 3 — Message Queue: implementation & tests
+
+**Goal:** Produce idiomatic, production-quality Go code for the Message Queue, fully commented and covered by tests.
+
+**Prompts:**
+
+1. *"Please do the initial implementation of the message-queue service following idiomatic Go coding standards. Do not write unit tests yet."*
+
+2. *"For every function and method you have written, please add a descriptive comment explaining its purpose, and add inline comments for each significant step inside the function body."*
+
+3. *"Please write unit tests for every method and function in every file of the message-queue service. Use table-driven tests. Ensure 100% branch coverage across every function and method."*
+
+---
+
+### Phase 4 — Streamer: architecture design, implementation & tests
+
+**Goal:** Design the Streamer end-to-end using the same structured discussion format used for the Message Queue, then implement and test it.
+
+**Architecture discussion prompts:**
+
+1. *"Let's discuss each architectural problem we need to solve in the Streamer service. Take one problem at a time, discuss it, finalise a decision, and then move to the next."*
+
+2. *"Think thoroughly — did we miss anything in the Streamer architecture discussion?"*
+
+3. *"Let's do a final pass and revisit every decision we made for the Streamer architecture to make sure everything is consistent and complete."*
+
+**Architecture document prompt:**
+
+*"Now that we have finalised the architecture for the Streamer, create a comprehensive and detailed document for the Streamer service (named `streamer` in Kubernetes). It should cover everything we discussed — CSV ingestion loop, batching strategy, publish retry logic, horizontal scalability, and observability — explained clearly enough for anyone joining the project to understand it from scratch."*
+
+**Implementation & test prompt:**
+
+*"Please write unit tests for every method and function in every file of the streamer service. Use table-driven tests. Ensure 100% branch coverage. Add descriptive comments for every significant step inside each function."*
+
+---
+
+### Phase 5 — Collector: architecture design, implementation & tests
+
+**Goal:** Design the Collector using the same structured discussion approach, produce the architecture document, and generate comprehensive tests.
+
+**Architecture discussion prompt:**
+
+*"Let's discuss each architectural problem we need to solve in the Collector service. Take one problem at a time, discuss it, finalise a decision, and then move on to the next."*
+
+**Architecture document prompt:**
+
+*"Now that we have finalised the architecture for the Collector, create a comprehensive and detailed document for the Collector service (named `collector` in Kubernetes). It should cover everything we discussed — long-poll consumption, message parsing, PostgreSQL bulk-insert strategy, schema migration, deduplication, horizontal scalability, and observability — explained clearly enough for anyone joining the project to understand it from scratch."*
+
+**Test prompt:**
+
+*"Please write unit tests for every method and function in every file of the collector service. Use table-driven tests. Ensure 100% branch coverage. Add descriptive comments for every significant step inside each function."*
+
+---
+
+### Phase 6 — API Gateway: architecture design, implementation & tests
+
+**Goal:** Design and implement the API Gateway with full awareness of the contracts established by the other three services.
+
+**Architecture discussion prompt:**
+
+*"Let's discuss each architectural problem we need to solve in the API Gateway service. Before we start, please review the implementation and architecture documents of the other three components so the API Gateway design is consistent with what is already built."*
+
+**Architecture document prompt:**
+
+*"Now that we have finalised the architecture for the API Gateway, create a comprehensive and detailed document for the API Gateway service (named `api-gateway` in Kubernetes). It should cover everything we discussed — routing, read-only PostgreSQL access, in-memory TTL cache for the GPU list, time-range query parameters, observability, and horizontal scalability — explained clearly enough for anyone joining the project to understand it from scratch."*
+
+**Implementation & test prompts:**
+
+1. *"Please implement the API Gateway service as per the agreed architecture, following idiomatic Go coding standards. Do not write unit tests yet."*
+
+2. *"Please write unit tests for every method and function in every file of the api-gateway service. Use table-driven tests. Ensure 100% branch coverage. Add descriptive comments for every significant step inside each function."*
+
+---
+
+### Phase 7 — Build infrastructure & DevOps
+
+**Goal:** Produce a complete, working build and deployment setup — from local development through to a multi-node Kubernetes cluster — in a single session.
+
+**Prompt:**
+
+*"Now that all four services are implemented and tested, produce the complete build setup for the system: a detailed Makefile, multi-stage Dockerfiles for each service, a docker-compose file for local development, Kubernetes manifests, Helm charts for each component, a kind cluster manifest, and an updated README. Ensure that when the full stack is running the end-to-end test scenario described in the project brief is executable."*
+
+**What was produced:**
+
+| Deliverable | AI-assisted? | Manual refinements |
 |---|---|---|
-| Repo / directory structure | Yes | Prompted for a Go module layout with `cmd/`, `internal/`, `build/`, `charts/` |
-| `go.mod` initial setup | Yes | AI suggested gin + pgx/v5 + google/uuid dependencies |
-| `.gitignore` | Yes | Standard Go gitignore generated |
+| Dockerfiles (multi-stage) | Yes | Build context anchored to repo root was a deliberate manual choice |
+| docker-compose.yaml | Yes | Healthcheck ordering (`collector` depends on both `postgres` and `message-queue`) refined manually |
+| kind-config.yaml | Yes | NodePort / `extraPortMappings` required reading kind docs directly |
+| Helm charts (all five components) | Yes | StatefulSet `VolumeClaimTemplate` for PostgreSQL required iteration |
+| Makefile | Yes | Phony targets, shell escaping, and `helm-install` ordering finalised manually |
+| OpenAPI annotations | Yes | Written in source then regenerated with `swag init` |
 
-**Prompts used:**
-- *"Bootstrap a Go 1.25 module for an elastic GPU telemetry pipeline with these four services: streamer, collector, message-queue, api-gateway. Use gin for HTTP and pgx/v5 for Postgres."*
+---
 
-### Source code
+### Phase 8 — Documentation
+
+**Goal:** Consolidate all per-service architecture documents and the README into a single, navigable knowledge base.
+
+**Prompts:**
+
+1. *"We now have a dedicated architecture document for each service, all located in the `docs/` directory. Carefully and thoroughly read through every file in that directory, and also the README. Based on all of that information, write a comprehensive and detailed combined architecture document named `GPU_TELEMETRY_PIPELINE_ARCHITECTURE.md`. Ensure each per-service document is appropriately cross-referenced."*
+
+2. *"Add a section to the README that documents how AI assistance was used throughout the project. Use the attached file of rough prompts as the source, refine and polish them, group them by development phase, and integrate them into that section."*
+
+---
+
+### Source code assistance summary
 
 | Component | AI-assisted? | Manual intervention |
 |---|---|---|
-| Message Queue ring buffer | Mostly AI | Concurrency correctness (atomic state transitions) reviewed manually |
-| Lease reaper | AI | Verified reaper does not starve the hot path |
-| Streamer CSV reader + publisher | AI | Retry/backoff logic tuned by hand |
-| Collector consumer loop | AI | Long-poll timeout interplay with HTTP client timeout required manual tuning |
-| Store (Postgres read/write) | AI | ON CONFLICT deduplication key selection done manually |
-| API Gateway handlers | AI | Time-range default window (now−1h) was a deliberate manual choice |
-| Config loaders | AI | All env-var names and defaults finalised manually |
+| Message Queue ring buffer | Mostly AI | Atomic state transitions reviewed manually for concurrency correctness |
+| Lease reaper | AI | Verified the reaper goroutine does not starve the publish hot path |
+| Streamer CSV reader + publisher | AI | Retry / backoff timing tuned by hand |
+| Collector long-poll consumer | AI | Timeout coordination between `COLLECTOR_LONG_POLL_TIMEOUT` and `QUEUE_HTTP_WRITE_TIMEOUT` required manual tuning |
+| PostgreSQL read/write layer | AI | `ON CONFLICT DO NOTHING` composite key selection was a deliberate manual decision |
+| API Gateway handlers | AI | Default time-range window (now − 1 h) was a deliberate manual choice |
+| Config loaders | AI | All environment variable names and default values finalised manually |
 
-**Prompts used (selection):**
-- *"Write a fixed-size in-memory ring buffer for a message queue in Go with atomic slot state transitions (free/occupied/in-flight). The buffer must support concurrent publish and consume without a global lock."*
-- *"Implement a lease reaper goroutine that scans the ring buffer for expired in-flight slots and requeues them."*
-- *"Write a Go HTTP long-poll consumer that pulls batches from the message queue and bulk-inserts them into PostgreSQL using pgx SendBatch."*
-- *"Design a PostgreSQL schema for DCGM GPU metrics with a composite primary key for deduplication and a secondary index optimised for time-range queries by GPU UUID."*
+---
 
-### Tests
+### Test generation
 
-All unit tests were AI-generated with the following prompt pattern:
+All unit tests across every package were AI-generated using the following consistent prompt pattern, applied once per service:
 
-- *"Write table-driven unit tests for `<package>` covering all exported functions, using mocks/stubs for external dependencies (Postgres, HTTP). Include edge cases."*
+> *"Write table-driven unit tests for every exported function and method in `<package>`. Use mocks or stubs for all external dependencies (PostgreSQL, HTTP). Ensure 100% branch coverage and add a descriptive inline comment for every significant step inside each test helper and setup function."*
 
-Manual intervention was required to:
-- Replace incorrect interface method signatures in mocks
-- Fix test cases where the AI incorrectly assumed time.Now() determinism
+Human review was required for:
+- Correcting interface method signatures in generated mock types
+- Fixing test cases where the AI assumed `time.Now()` was deterministic across calls
 
-### Build environment
+---
 
-| Deliverable | AI-assisted? | Manual notes |
-|---|---|---|
-| Dockerfiles (multi-stage) | Yes | Build context choice (repo root) was a manual decision |
-| docker-compose.yaml | Yes | Healthcheck ordering (collector depends on postgres AND queue) refined manually |
-| kind-config.yaml | Yes | NodePort / extraPortMapping required reading kind docs manually |
-| Helm charts (all templates) | Yes | StatefulSet VolumeClaimTemplate for Postgres required iteration |
-| Makefile | Yes | Phony targets, shell escaping, and `helm-install` order finalised manually |
-| OpenAPI spec | Yes | Written manually then annotated for swag auto-generation |
+### Where AI fell short — required manual fixes
 
-**Prompts used:**
-- *"Write a multi-stage Dockerfile for a Go 1.25 service. Stage 1 builds a static binary using golang:1.25-alpine. Stage 2 uses alpine:3.20 with wget installed for health checks."*
-- *"Write a comprehensive Makefile for a Go project with targets for build, test, coverage, docker-build/push, docker-compose, kind cluster management, Helm chart install, and OpenAPI generation."*
-- *"Write a Helm chart for a Kubernetes Deployment that mounts a ConfigMap as a volume for the streamer service's CSV data."*
-- *"Write a Helm StatefulSet chart for PostgreSQL 16 with a PersistentVolumeClaim."*
+1. **Concurrent ring-buffer correctness** — The initial implementation used a single mutex protecting all buffer operations. This was replaced with per-slot atomic state transitions (`free → occupied → in-flight → free`) to eliminate contention on the publish hot path.
 
-### Where AI fell short / required manual fixes
+2. **Long-poll timeout coordination** — The AI initially set `COLLECTOR_LONG_POLL_TIMEOUT` equal to `QUEUE_HTTP_WRITE_TIMEOUT`. In practice the HTTP server's write timeout must be strictly greater than the long-poll duration, otherwise the server closes the connection before the response is flushed. This required manual reasoning about the two timeout layers.
 
-1. **Concurrent ring-buffer correctness**: The initial AI-generated buffer used a mutex for all operations. This was replaced with atomic state transitions to avoid contention on the publish hot path.
+3. **Kind NodePort mapping** — The first AI-generated `kind-config.yaml` attempted to use an Ingress mapping, which requires an ingress controller that is not present in a bare kind cluster. This was replaced with a direct `extraPortMappings` entry that forwards host port 9090 to the API Gateway NodePort.
 
-2. **Long-poll timeout coordination**: The AI set `COLLECTOR_LONG_POLL_TIMEOUT` = `QUEUE_HTTP_WRITE_TIMEOUT`. In practice the queue write timeout must exceed the long-poll timeout to prevent the server closing the connection before the response is written.
-
-3. **Kind NodePort mapping**: The initial AI-generated `kind-config.yaml` used an `Ingress` mapping that does not work without an ingress controller. Replaced with a direct `extraPortMappings` entry targeting the NodePort.
-
-4. **swag annotation syntax**: The first AI-generated swag annotations used incorrect types for the `{array}` response. The correct format `{array} store.GPUSummary` required consultation with the swag documentation.
+4. **swag annotation syntax** — The initial OpenAPI annotations used an incorrect type syntax for array responses. The correct format (`{array} store.GPUSummary`) was found by consulting the swag documentation directly rather than accepting the AI's first attempt.
